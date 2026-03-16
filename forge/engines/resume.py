@@ -5,8 +5,8 @@ from __future__ import annotations
 import sqlite3
 
 from forge.config import ForgeConfig
-from forge.core.context import build_context
-from forge.storage.models import Decision, Knowledge, Session
+from forge.core.context import build_context, format_decisions, format_knowledge
+from forge.storage.models import Decision, Failure, Knowledge, Session
 from forge.storage.queries import (
     insert_session,
     list_decisions,
@@ -14,20 +14,6 @@ from forge.storage.queries import (
     list_knowledge,
     list_rules,
 )
-
-
-def _format_decisions(decisions: list[Decision]) -> str:
-    lines = []
-    for d in decisions:
-        lines.append(f"[DECISION] {d.statement} | Q:{d.q:.2f} | {d.status}")
-    return "\n".join(lines)
-
-
-def _format_knowledge(knowledge_list: list[Knowledge]) -> str:
-    lines = []
-    for k in knowledge_list:
-        lines.append(f"[KNOWLEDGE] {k.title} | Q:{k.q:.2f}")
-    return "\n".join(lines)
 
 
 def run_resume(
@@ -39,7 +25,7 @@ def run_resume(
     """context 생성 + session 기록 + 포맷된 문자열 반환."""
     raw_failures = list_failures(db, workspace_id)
     # Deduplicate by pattern: prefer project-local over global
-    seen_patterns: dict[str, object] = {}
+    seen_patterns: dict[str, Failure] = {}
     for f in raw_failures:
         if f.pattern not in seen_patterns or f.workspace_id == workspace_id:
             seen_patterns[f.pattern] = f
@@ -63,10 +49,10 @@ def run_resume(
     extra_parts: list[str] = []
     if decisions:
         extra_parts.append("## Active Decisions")
-        extra_parts.append(_format_decisions(decisions))
+        extra_parts.append(format_decisions(decisions))
     if knowledge_list:
         extra_parts.append("## Knowledge")
-        extra_parts.append(_format_knowledge(knowledge_list))
+        extra_parts.append(format_knowledge(knowledge_list))
 
     if extra_parts:
         # rules 섹션이 있으면 그 앞에, 없으면 base_context 뒤에 붙임

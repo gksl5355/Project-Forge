@@ -88,6 +88,10 @@ def _do_writeback(
     bash_failures = parse_transcript(transcript_path)
     all_failures = list_failures(db, workspace_id)
 
+    n_failures = len(bash_failures)
+    m_q_updates = 0
+    p_promotions = 0
+
     # 1. 각 Bash 실패 → 패턴 매칭 또는 새 패턴 생성
     for bf in bash_failures:
         matched = match_pattern(bf.stderr, all_failures)
@@ -122,6 +126,8 @@ def _do_writeback(
     all_failures = list_failures(db, workspace_id)
 
     # 2. 주입 경고 vs 실제 발생 비교 → Q 갱신
+    # NOTE: Decision Q 갱신은 v1으로 연기. v0에서는 수동 status 변경(cmd_edit) 시에만
+    #       EMA 업데이트 적용 (cli.py 담당). 자동화된 writeback에서는 Failure Q만 처리.
     session = get_session(db, session_id)
     if session:
         for warned_pattern in session.warnings_injected:
@@ -143,6 +149,7 @@ def _do_writeback(
                 failure.times_helped += 1
                 failure.times_warned += 1
             update_failure(db, failure)
+            m_q_updates += 1
 
     # 3. 시간 감쇠 (last_used > 1일 이상)
     now = datetime.now(UTC)
@@ -163,10 +170,16 @@ def _do_writeback(
             if not existing_global:
                 global_copy = promote_to_global(failure)
                 insert_failure(db, global_copy)
+                print(f"[forge] Global promoted: '{failure.pattern}' (Q: {failure.q:.2f})")
+                p_promotions += 1
 
         if check_knowledge_promote(failure, config):
             knowledge = promote_to_knowledge(failure)
             insert_knowledge(db, knowledge)
+            print(f"[forge] Knowledge candidate: '{failure.pattern}' → '{knowledge.title}' (Q: {failure.q:.2f})")
+            p_promotions += 1
 
     # 5. 세션 종료 기록
     update_session_end(db, session_id)
+
+    print(f"[forge] Writeback: {n_failures} failures processed, {m_q_updates} Q-updates, {p_promotions} promotions")

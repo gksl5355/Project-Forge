@@ -13,14 +13,23 @@ def check_global_promote(failure: Failure, config: ForgeConfig) -> bool:
     return len(failure.projects_seen) >= config.promote_threshold
 
 
-def promote_to_global(failure: Failure) -> Failure:
-    """failure의 __global__ workspace 복사본을 반환."""
+def promote_to_global(
+    failure: Failure,
+    merge_from: list[Failure] | None = None,
+) -> Failure:
+    """failure의 __global__ workspace 복사본을 반환.
+
+    merge_from이 제공되면 동일 패턴의 모든 워크스페이스 failure를 merge_q()로
+    가중 평균하여 Q를 결정한다. caller는 proper Q merging을 위해
+    동일 패턴의 모든 failure를 전달해야 한다.
+    """
+    q = merge_q(merge_from) if merge_from else failure.q
     return Failure(
         workspace_id="__global__",
         pattern=failure.pattern,
         avoid_hint=failure.avoid_hint,
         hint_quality=failure.hint_quality,
-        q=failure.q,
+        q=q,
         times_seen=failure.times_seen,
         times_helped=failure.times_helped,
         times_warned=failure.times_warned,

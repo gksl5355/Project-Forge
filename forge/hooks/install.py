@@ -38,30 +38,30 @@ def install_hooks() -> None:
 
     # SessionStart → resume.sh
     session_start = hooks.setdefault("SessionStart", [])
-    resume_entry = {
-        "type": "command",
-        "command": str(_HOOKS_DIR / "resume.sh"),
-    }
-    if not _entry_exists(session_start, resume_entry["command"]):
-        session_start.append(resume_entry)
+    resume_cmd = str(_HOOKS_DIR / "resume.sh")
+    if not _entry_exists(session_start, resume_cmd):
+        session_start.append({
+            "matcher": "",
+            "hooks": [{"type": "command", "command": resume_cmd}],
+        })
 
     # SessionEnd → writeback.sh
     session_end = hooks.setdefault("SessionEnd", [])
-    writeback_entry = {
-        "type": "command",
-        "command": str(_HOOKS_DIR / "writeback.sh"),
-    }
-    if not _entry_exists(session_end, writeback_entry["command"]):
-        session_end.append(writeback_entry)
+    writeback_cmd = str(_HOOKS_DIR / "writeback.sh")
+    if not _entry_exists(session_end, writeback_cmd):
+        session_end.append({
+            "matcher": "",
+            "hooks": [{"type": "command", "command": writeback_cmd}],
+        })
 
-    # PostToolUse → detect.sh
+    # PostToolUse → detect.sh (Bash 툴에만 매칭)
     post_tool = hooks.setdefault("PostToolUse", [])
-    detect_entry = {
-        "type": "command",
-        "command": str(_HOOKS_DIR / "detect.sh"),
-    }
-    if not _entry_exists(post_tool, detect_entry["command"]):
-        post_tool.append(detect_entry)
+    detect_cmd = str(_HOOKS_DIR / "detect.sh")
+    if not _entry_exists(post_tool, detect_cmd):
+        post_tool.append({
+            "matcher": "Bash",
+            "hooks": [{"type": "command", "command": detect_cmd}],
+        })
 
     _SETTINGS_PATH.write_text(
         json.dumps(settings, indent=2, ensure_ascii=False),
@@ -70,7 +70,10 @@ def install_hooks() -> None:
 
 
 def _entry_exists(hook_list: list, command: str) -> bool:
-    return any(
-        isinstance(e, dict) and e.get("command") == command
-        for e in hook_list
-    )
+    for e in hook_list:
+        if not isinstance(e, dict):
+            continue
+        for hook in e.get("hooks", []):
+            if isinstance(hook, dict) and hook.get("command") == command:
+                return True
+    return False

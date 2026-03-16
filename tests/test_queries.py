@@ -5,6 +5,8 @@ from datetime import datetime
 
 from forge.storage.models import Decision, Failure, Knowledge, Rule, Session
 from forge.storage.queries import (
+    get_decision_by_id,
+    get_failure_by_id,
     get_failure_by_pattern,
     get_session,
     insert_decision,
@@ -14,6 +16,7 @@ from forge.storage.queries import (
     insert_session,
     list_decisions,
     list_failures,
+    list_flagged_failures,
     list_knowledge,
     list_rules,
     search_by_tags,
@@ -81,6 +84,52 @@ class TestInsertAndGetFailure:
         insert_failure(db, f)
         found = get_failure_by_pattern(db, "ws1", "conn_error")
         assert found.review_flag is True
+
+
+class TestGetFailureById:
+    def test_found_by_id(self, db):
+        fid = insert_failure(db, make_failure())
+        found = get_failure_by_id(db, fid, "ws1")
+        assert found is not None
+        assert found.id == fid
+        assert found.pattern == "conn_error"
+
+    def test_not_found_wrong_id(self, db):
+        insert_failure(db, make_failure())
+        result = get_failure_by_id(db, 99999, "ws1")
+        assert result is None
+
+    def test_not_found_wrong_workspace(self, db):
+        fid = insert_failure(db, make_failure())
+        result = get_failure_by_id(db, fid, "other_ws")
+        assert result is None
+
+
+class TestListFlaggedFailures:
+    def test_returns_only_flagged(self, db):
+        insert_failure(db, make_failure(pattern="flagged_err", review_flag=True))
+        insert_failure(db, make_failure(pattern="normal_err", review_flag=False))
+        results = list_flagged_failures(db, "ws1")
+        patterns = {f.pattern for f in results}
+        assert "flagged_err" in patterns
+        assert "normal_err" not in patterns
+
+    def test_empty_when_no_flagged(self, db):
+        insert_failure(db, make_failure(pattern="normal_err", review_flag=False))
+        results = list_flagged_failures(db, "ws1")
+        assert results == []
+
+    def test_empty_workspace_returns_empty(self, db):
+        results = list_flagged_failures(db, "no_ws")
+        assert results == []
+
+    def test_workspace_isolated(self, db):
+        insert_failure(db, make_failure(workspace_id="ws1", pattern="ws1_flagged", review_flag=True))
+        insert_failure(db, make_failure(workspace_id="ws2", pattern="ws2_flagged", review_flag=True))
+        results = list_flagged_failures(db, "ws1")
+        patterns = {f.pattern for f in results}
+        assert "ws1_flagged" in patterns
+        assert "ws2_flagged" not in patterns
 
 
 class TestListFailures:
@@ -186,6 +235,29 @@ class TestSearchByTags:
 # ---------------------------------------------------------------------------
 # Decision
 # ---------------------------------------------------------------------------
+
+class TestGetDecisionById:
+    def make_decision(self, **kwargs) -> Decision:
+        defaults = dict(workspace_id="ws1", statement="Use sqlite3")
+        defaults.update(kwargs)
+        return Decision(**defaults)
+
+    def test_found_by_id(self, db):
+        did = insert_decision(db, self.make_decision())
+        found = get_decision_by_id(db, did, "ws1")
+        assert found is not None
+        assert found.id == did
+
+    def test_not_found_wrong_id(self, db):
+        insert_decision(db, self.make_decision())
+        result = get_decision_by_id(db, 99999, "ws1")
+        assert result is None
+
+    def test_not_found_wrong_workspace(self, db):
+        did = insert_decision(db, self.make_decision())
+        result = get_decision_by_id(db, did, "other_ws")
+        assert result is None
+
 
 class TestDecisionCRUD:
     def make_decision(self, **kwargs) -> Decision:

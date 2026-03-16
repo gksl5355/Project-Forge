@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import sys
 from pathlib import Path
 from typing import Optional
@@ -10,6 +11,7 @@ from typing import Optional
 import typer
 
 from forge.config import load_config
+from forge.core.promote import promote_to_global, promote_to_knowledge
 from forge.core.qvalue import initial_q, time_decay
 from forge.engines.detect import run_detect
 from forge.engines.resume import run_resume
@@ -17,6 +19,8 @@ from forge.engines.writeback import run_writeback
 from forge.storage.db import get_connection, init_db
 from forge.storage.models import Decision, Failure, Knowledge, Rule
 from forge.storage.queries import (
+    get_decision_by_id,
+    get_failure_by_id,
     get_failure_by_pattern,
     insert_decision,
     insert_failure,
@@ -24,8 +28,10 @@ from forge.storage.queries import (
     insert_rule,
     list_decisions,
     list_failures,
+    list_flagged_failures,
     list_knowledge,
     list_rules,
+    search_by_tags,
     update_decision,
     update_failure,
     update_rule,
@@ -34,11 +40,6 @@ from forge.storage.queries import (
 app = typer.Typer(help="Project Forge — 코딩 에이전트를 위한 경험 학습 CLI")
 record_app = typer.Typer(help="경험 데이터 기록")
 app.add_typer(record_app, name="record")
-
-
-def _get_db():
-    config = load_config()
-    return get_connection(), config
 
 
 # ---------------------------------------------------------------------------
@@ -87,10 +88,9 @@ def cmd_record_failure(
         likely_cause=cause,
         source="manual",
     )
-    import sqlite3 as _sqlite3
     try:
         fid = insert_failure(db, failure)
-    except _sqlite3.IntegrityError:
+    except sqlite3.IntegrityError:
         typer.echo(f"Pattern '{pattern}' already exists in workspace '{workspace}'. Use 'forge edit' to update.", err=True)
         raise typer.Exit(1)
     typer.echo(f"Failure recorded (id={fid}): {pattern}")
@@ -187,12 +187,16 @@ def cmd_list(
     type_: str = typer.Option("failure", "--type", "-t",
                                help="failure | decision | rule | knowledge"),
     sort: str = typer.Option("q", "--sort", "-s", help="정렬 기준 (q, times_seen, created_at)"),
+    flagged: bool = typer.Option(False, "--flagged", help="review_flag가 True인 실패만 표시"),
 ):
     """경험 목록 조회."""
     db = get_connection()
 
     if type_ == "failure":
-        items = list_failures(db, workspace, sort_by=sort)
+        if flagged:
+            items = list_flagged_failures(db, workspace)
+        else:
+            items = list_failures(db, workspace, sort_by=sort)
         for f in items:
             typer.echo(f"[{f.id}] {f.pattern} | Q:{f.q:.2f} | {f.hint_quality} | seen:{f.times_seen}")
     elif type_ == "decision":
@@ -222,7 +226,6 @@ def cmd_search(
     workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
 ):
     """태그로 실패 검색."""
-    from forge.storage.queries import search_by_tags
     db = get_connection()
     items = search_by_tags(db, workspace, tag)
     if not items:
@@ -277,27 +280,25 @@ def cmd_edit(
     db = get_connection()
 
     # Failure 시도
-    row = db.execute("SELECT * FROM failures WHERE id = ? AND workspace_id = ?",
-                     (id_, workspace)).fetchone()
-    if row:
-        from forge.storage.queries import _row_to_failure  # type: ignore[attr-defined]
-        # 직접 update
-        if hint:
-            db.execute("UPDATE failures SET avoid_hint = ?, updated_at = datetime('now') WHERE id = ?",
-                       (hint, id_))
-            db.commit()
-            typer.echo(f"Failure {id_} hint updated.")
+    failure = get_failure_by_id(db, id_, workspace)
+    if failure:
+        if not hint:
+            typer.echo("No changes requested. Use --hint to update avoid_hint.", err=True)
+            return
+        failure.avoid_hint = hint
+        update_failure(db, failure)
+        typer.echo(f"Failure {id_} hint updated.")
         return
 
     # Decision 시도
-    row = db.execute("SELECT * FROM decisions WHERE id = ? AND workspace_id = ?",
-                     (id_, workspace)).fetchone()
-    if row:
-        if rationale:
-            db.execute("UPDATE decisions SET rationale = ?, updated_at = datetime('now') WHERE id = ?",
-                       (rationale, id_))
-            db.commit()
-            typer.echo(f"Decision {id_} rationale updated.")
+    decision = get_decision_by_id(db, id_, workspace)
+    if decision:
+        if not rationale:
+            typer.echo("No changes requested. Use --rationale to update rationale.", err=True)
+            return
+        decision.rationale = rationale
+        update_decision(db, decision)
+        typer.echo(f"Decision {id_} rationale updated.")
         return
 
     typer.echo(f"Item {id_} not found in workspace '{workspace}'", err=True)
@@ -315,17 +316,12 @@ def cmd_promote(
     to_knowledge: bool = typer.Option(False, "--to-knowledge", help="knowledge로 승격"),
 ):
     """Failure를 전역 또는 knowledge로 승격."""
-    from forge.core.promote import promote_to_global, promote_to_knowledge
     db = get_connection()
     row = db.execute("SELECT * FROM failures WHERE id = ?", (id_,)).fetchone()
     if not row:
         typer.echo(f"Failure {id_} not found.", err=True)
         raise typer.Exit(1)
 
-    from forge.storage.queries import _row_to_failure  # type: ignore[attr-defined]
-    import json as _json
-
-    # 직접 row → Failure 변환 (private 함수 직접 참조 대신 inline)
     failure = Failure(
         id=row["id"],
         workspace_id=row["workspace_id"],
@@ -336,8 +332,8 @@ def cmd_promote(
         times_seen=row["times_seen"],
         times_helped=row["times_helped"],
         times_warned=row["times_warned"],
-        tags=_json.loads(row["tags"] or "[]"),
-        projects_seen=_json.loads(row["projects_seen"] or "[]"),
+        tags=json.loads(row["tags"] or "[]"),
+        projects_seen=json.loads(row["projects_seen"] or "[]"),
         source=row["source"],
         review_flag=bool(row["review_flag"]),
         observed_error=row["observed_error"],
@@ -486,7 +482,7 @@ def cmd_detect(
 @app.command("install-hooks")
 def cmd_install_hooks():
     """Claude Code hook 설정 설치."""
-    from forge.hooks.install import install_hooks
+    from forge.hooks.install import install_hooks  # lazy import to avoid startup cost
     install_hooks()
     typer.echo("Hooks installed successfully.")
 

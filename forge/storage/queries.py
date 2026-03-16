@@ -98,6 +98,16 @@ def get_failure_by_pattern(
     return _row_to_failure(row) if row else None
 
 
+def get_failure_by_id(
+    db: sqlite3.Connection, failure_id: int, workspace_id: str
+) -> Failure | None:
+    row = db.execute(
+        "SELECT * FROM failures WHERE id = ? AND workspace_id = ?",
+        (failure_id, workspace_id),
+    ).fetchone()
+    return _row_to_failure(row) if row else None
+
+
 def list_failures(
     db: sqlite3.Connection,
     workspace_id: str,
@@ -149,6 +159,17 @@ def update_failure(db: sqlite3.Connection, failure: Failure) -> None:
         ),
     )
     db.commit()
+
+
+def list_flagged_failures(
+    db: sqlite3.Connection, workspace_id: str
+) -> list[Failure]:
+    """review_flag=True인 실패 목록 반환."""
+    rows = db.execute(
+        "SELECT * FROM failures WHERE workspace_id = ? AND review_flag = 1 ORDER BY q DESC",
+        (workspace_id,),
+    ).fetchall()
+    return [_row_to_failure(r) for r in rows]
 
 
 def search_by_tags(
@@ -217,6 +238,16 @@ def insert_decision(db: sqlite3.Connection, decision: Decision) -> int:
     )
     db.commit()
     return cur.lastrowid
+
+
+def get_decision_by_id(
+    db: sqlite3.Connection, decision_id: int, workspace_id: str
+) -> Decision | None:
+    row = db.execute(
+        "SELECT * FROM decisions WHERE id = ? AND workspace_id = ?",
+        (decision_id, workspace_id),
+    ).fetchone()
+    return _row_to_decision(row) if row else None
 
 
 def list_decisions(

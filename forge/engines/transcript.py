@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -79,8 +80,6 @@ def _extract_bash_failure(obj: dict) -> BashFailure | None:
 
 def _get_exit_code(obj: dict) -> int | None:
     """exit_code를 다양한 위치에서 찾아 반환."""
-    import re
-
     # 직접 키
     if "exit_code" in obj:
         try:
@@ -113,8 +112,6 @@ def _get_exit_code(obj: dict) -> int | None:
 
 def _get_output(obj: dict) -> tuple[str, str]:
     """stdout, stderr를 다양한 위치에서 추출."""
-    import re
-
     # 직접 키
     stdout = obj.get("stdout") or ""
     stderr = obj.get("stderr") or ""

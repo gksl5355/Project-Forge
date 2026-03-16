@@ -108,6 +108,33 @@ def test_promote_to_global_copies_tags_independently():
     assert "tag2" not in global_failure.tags
 
 
+def test_promote_to_global_uses_failure_q_when_no_merge_from():
+    failure = _make_failure(q=0.7)
+    global_failure = promote_to_global(failure)
+    assert global_failure.q == pytest.approx(0.7)
+
+
+def test_promote_to_global_uses_merge_q_when_merge_from_provided():
+    f1 = _make_failure(q=0.8)
+    f1.times_seen = 3
+    f2 = _make_failure(q=0.2)
+    f2.times_seen = 1
+    # merge_q = (0.8*3 + 0.2*1) / 4 = 0.65
+    global_failure = promote_to_global(f1, merge_from=[f1, f2])
+    assert global_failure.q == pytest.approx(0.65)
+
+
+def test_promote_to_global_merge_from_overrides_failure_q():
+    f1 = _make_failure(q=0.9)
+    f2 = _make_failure(q=0.1)
+    for f in [f1, f2]:
+        f.times_seen = 1
+    # merge_q = 0.5, not 0.9
+    global_failure = promote_to_global(f1, merge_from=[f1, f2])
+    assert global_failure.q != pytest.approx(0.9)
+    assert global_failure.q == pytest.approx(0.5)
+
+
 # --- check_knowledge_promote ---
 
 def test_check_knowledge_promote_true():
