@@ -4,7 +4,7 @@ An experience learning CLI tool for coding agents. Accumulates failures, decisio
 
 ## Tech Stack
 
-- Python 3.11+, Typer (CLI), sqlite3 (built-in), PyYAML
+- Python 3.12+, Typer (CLI), sqlite3 (built-in), PyYAML
 - Minimize external dependencies. No SQLAlchemy.
 - Models: Python dataclass. Tests: pytest.
 

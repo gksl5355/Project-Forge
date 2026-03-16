@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, UTC
 
 
 @dataclass
@@ -23,8 +23,8 @@ class Failure:
     observed_error: str | None = None
     likely_cause: str | None = None
     last_used: datetime | None = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     id: int | None = None
 
 
@@ -39,8 +39,8 @@ class Decision:
     superseded_by: int | None = None
     tags: list[str] = field(default_factory=list)
     last_used: datetime | None = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     id: int | None = None
 
 
@@ -51,7 +51,7 @@ class Rule:
     scope: str | None = None
     enforcement_mode: str = "warn"  # block | warn | log
     active: bool = True
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     id: int | None = None
 
 
@@ -65,7 +65,7 @@ class Knowledge:
     tags: list[str] = field(default_factory=list)
     promoted_from: int | None = None
     last_used: datetime | None = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     id: int | None = None
 
 
@@ -74,6 +74,6 @@ class Session:
     session_id: str
     workspace_id: str
     warnings_injected: list[str] = field(default_factory=list)
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     ended_at: datetime | None = None
     id: int | None = None

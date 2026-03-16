@@ -390,11 +390,11 @@ def cmd_decay(
     dry_run: bool = typer.Option(False, "--dry-run", help="실제로 적용하지 않고 미리보기"),
 ):
     """시간 감쇠 적용 (오래된 실패 패턴 Q 감소)."""
-    from datetime import datetime
+    from datetime import datetime, UTC
     db = get_connection()
     config = load_config()
     failures = list_failures(db, workspace, include_global=False)
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     updated = 0
 
     for failure in failures:

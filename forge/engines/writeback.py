@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
@@ -93,7 +93,7 @@ def _do_writeback(
         matched = match_pattern(bf.stderr, all_failures)
         if matched:
             matched.times_seen += 1
-            matched.last_used = datetime.utcnow()
+            matched.last_used = datetime.now(UTC)
             update_failure(db, matched)
         else:
             if not bf.stderr.strip():
@@ -102,7 +102,7 @@ def _do_writeback(
             existing = get_failure_by_pattern(db, workspace_id, pattern_name)
             if existing:
                 existing.times_seen += 1
-                existing.last_used = datetime.utcnow()
+                existing.last_used = datetime.now(UTC)
                 update_failure(db, existing)
             else:
                 q0 = initial_q("preventable", config)
@@ -114,7 +114,7 @@ def _do_writeback(
                     q=q0,
                     source="auto",
                     observed_error=bf.stderr[:500] if bf.stderr else None,
-                    last_used=datetime.utcnow(),
+                    last_used=datetime.now(UTC),
                 )
                 insert_failure(db, new_failure)
 
@@ -145,7 +145,7 @@ def _do_writeback(
             update_failure(db, failure)
 
     # 3. 시간 감쇠 (last_used > 1일 이상)
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     stale_failures = list_failures(db, workspace_id, include_global=False)
     for failure in stale_failures:
         if failure.last_used is None:

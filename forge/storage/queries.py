@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, UTC
 
 from forge.storage.models import Decision, Failure, Knowledge, Rule, Session
 
@@ -49,8 +49,8 @@ def _row_to_failure(row: sqlite3.Row) -> Failure:
         source=row["source"],
         review_flag=bool(row["review_flag"]),
         last_used=_parse_dt(row["last_used"]),
-        created_at=_parse_dt(row["created_at"]) or datetime.utcnow(),
-        updated_at=_parse_dt(row["updated_at"]) or datetime.utcnow(),
+        created_at=_parse_dt(row["created_at"]) or datetime.now(UTC),
+        updated_at=_parse_dt(row["updated_at"]) or datetime.now(UTC),
     )
 
 
@@ -144,7 +144,7 @@ def update_failure(db: sqlite3.Connection, failure: Failure) -> None:
             failure.source,
             int(failure.review_flag),
             _dt_str(failure.last_used),
-            _dt_str(datetime.utcnow()),
+            _dt_str(datetime.now(UTC)),
             failure.id,
         ),
     )
@@ -188,8 +188,8 @@ def _row_to_decision(row: sqlite3.Row) -> Decision:
         superseded_by=row["superseded_by"],
         tags=json.loads(row["tags"] or "[]"),
         last_used=_parse_dt(row["last_used"]),
-        created_at=_parse_dt(row["created_at"]) or datetime.utcnow(),
-        updated_at=_parse_dt(row["updated_at"]) or datetime.utcnow(),
+        created_at=_parse_dt(row["created_at"]) or datetime.now(UTC),
+        updated_at=_parse_dt(row["updated_at"]) or datetime.now(UTC),
     )
 
 
@@ -246,7 +246,7 @@ def update_decision(db: sqlite3.Connection, decision: Decision) -> None:
             decision.superseded_by,
             json.dumps(decision.tags),
             _dt_str(decision.last_used),
-            _dt_str(datetime.utcnow()),
+            _dt_str(datetime.now(UTC)),
             decision.id,
         ),
     )
@@ -265,7 +265,7 @@ def _row_to_rule(row: sqlite3.Row) -> Rule:
         scope=row["scope"],
         enforcement_mode=row["enforcement_mode"],
         active=bool(row["active"]),
-        created_at=_parse_dt(row["created_at"]) or datetime.utcnow(),
+        created_at=_parse_dt(row["created_at"]) or datetime.now(UTC),
     )
 
 
@@ -330,7 +330,7 @@ def _row_to_knowledge(row: sqlite3.Row) -> Knowledge:
         tags=json.loads(row["tags"] or "[]"),
         promoted_from=row["promoted_from"],
         last_used=_parse_dt(row["last_used"]),
-        created_at=_parse_dt(row["created_at"]) or datetime.utcnow(),
+        created_at=_parse_dt(row["created_at"]) or datetime.now(UTC),
     )
 
 
@@ -384,7 +384,7 @@ def _row_to_session(row: sqlite3.Row) -> Session:
         session_id=row["session_id"],
         workspace_id=row["workspace_id"],
         warnings_injected=json.loads(row["warnings_injected"] or "[]"),
-        started_at=_parse_dt(row["started_at"]) or datetime.utcnow(),
+        started_at=_parse_dt(row["started_at"]) or datetime.now(UTC),
         ended_at=_parse_dt(row["ended_at"]),
     )
 
@@ -419,6 +419,6 @@ def get_session(db: sqlite3.Connection, session_id: str) -> Session | None:
 def update_session_end(db: sqlite3.Connection, session_id: str) -> None:
     db.execute(
         "UPDATE sessions SET ended_at = ? WHERE session_id = ?",
-        (_dt_str(datetime.utcnow()), session_id),
+        (_dt_str(datetime.now(UTC)), session_id),
     )
     db.commit()

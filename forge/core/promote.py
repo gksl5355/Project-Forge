@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, UTC
 
 from forge.config import ForgeConfig
 from forge.storage.models import Failure, Knowledge
@@ -31,8 +31,8 @@ def promote_to_global(failure: Failure) -> Failure:
         observed_error=failure.observed_error,
         likely_cause=failure.likely_cause,
         last_used=failure.last_used,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         id=None,
     )
 
@@ -70,6 +70,6 @@ def promote_to_knowledge(failure: Failure) -> Knowledge:
         tags=list(failure.tags),
         promoted_from=failure.id,
         last_used=failure.last_used,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
         id=None,
     )
