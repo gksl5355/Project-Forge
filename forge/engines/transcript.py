@@ -79,6 +79,8 @@ def _extract_bash_failure(obj: dict) -> BashFailure | None:
 
 def _get_exit_code(obj: dict) -> int | None:
     """exit_code를 다양한 위치에서 찾아 반환."""
+    import re
+
     # 직접 키
     if "exit_code" in obj:
         try:
@@ -86,7 +88,7 @@ def _get_exit_code(obj: dict) -> int | None:
         except (TypeError, ValueError):
             pass
 
-    # result / output 하위 키
+    # result / output 하위 dict 키
     for sub_key in ("result", "output", "content"):
         sub = obj.get(sub_key)
         if isinstance(sub, dict) and "exit_code" in sub:
@@ -95,18 +97,31 @@ def _get_exit_code(obj: dict) -> int | None:
             except (TypeError, ValueError):
                 pass
 
+    # content가 list of dicts (Claude Code transcript 형식)
+    # [{"type":"text","text":"Exit code: 1\nstderr: ..."}]
+    content = obj.get("content")
+    if isinstance(content, list):
+        for item in content:
+            if isinstance(item, dict):
+                text = item.get("text", "")
+                m = re.search(r"Exit code:\s*(\d+)", text)
+                if m:
+                    return int(m.group(1))
+
     return None
 
 
 def _get_output(obj: dict) -> tuple[str, str]:
     """stdout, stderr를 다양한 위치에서 추출."""
+    import re
+
     # 직접 키
     stdout = obj.get("stdout") or ""
     stderr = obj.get("stderr") or ""
     if stdout or stderr:
         return str(stdout), str(stderr)
 
-    # result / output 하위 키
+    # result / output 하위 dict 키
     for sub_key in ("result", "output", "content"):
         sub = obj.get(sub_key)
         if isinstance(sub, dict):
@@ -114,6 +129,18 @@ def _get_output(obj: dict) -> tuple[str, str]:
             stderr = sub.get("stderr") or ""
             if stdout or stderr:
                 return str(stdout), str(stderr)
+
+    # content가 list of dicts (Claude Code transcript 형식)
+    content = obj.get("content")
+    if isinstance(content, list):
+        for item in content:
+            if isinstance(item, dict):
+                text = item.get("text", "")
+                # "stderr: ..." 패턴 추출
+                m = re.search(r"stderr:\s*(.+)", text, re.DOTALL)
+                if m:
+                    stderr = m.group(1).strip()
+                    return "", stderr
 
     return "", ""
 
