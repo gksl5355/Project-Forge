@@ -22,6 +22,7 @@ from forge.storage.queries import (
     search_by_tags,
     update_failure,
     update_session_end,
+    update_session_metrics,
 )
 
 
@@ -416,3 +417,33 @@ class TestSessionCRUD:
         insert_session(db, self.make_session(warnings_injected=[]))
         s = get_session(db, "sess-001")
         assert s.warnings_injected == []
+
+    def test_new_metric_fields_default_zero(self, db):
+        insert_session(db, self.make_session())
+        s = get_session(db, "sess-001")
+        assert s.failures_encountered == 0
+        assert s.q_updates_count == 0
+        assert s.promotions_count == 0
+
+    def test_insert_with_metrics(self, db):
+        session = self.make_session(
+            failures_encountered=3, q_updates_count=2, promotions_count=1
+        )
+        insert_session(db, session)
+        s = get_session(db, "sess-001")
+        assert s.failures_encountered == 3
+        assert s.q_updates_count == 2
+        assert s.promotions_count == 1
+
+    def test_update_session_metrics(self, db):
+        insert_session(db, self.make_session())
+        update_session_metrics(db, "sess-001", 5, 3, 2)
+        s = get_session(db, "sess-001")
+        assert s.failures_encountered == 5
+        assert s.q_updates_count == 3
+        assert s.promotions_count == 2
+        assert s.ended_at is not None
+
+    def test_update_session_metrics_not_found_noop(self, db):
+        """없는 session_id에 update해도 예외 없음."""
+        update_session_metrics(db, "nonexistent", 1, 1, 1)  # should not raise

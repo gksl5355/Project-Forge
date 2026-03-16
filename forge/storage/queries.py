@@ -410,6 +410,7 @@ def list_knowledge(
 # ---------------------------------------------------------------------------
 
 def _row_to_session(row: sqlite3.Row) -> Session:
+    keys = row.keys()
     return Session(
         id=row["id"],
         session_id=row["session_id"],
@@ -417,6 +418,9 @@ def _row_to_session(row: sqlite3.Row) -> Session:
         warnings_injected=json.loads(row["warnings_injected"] or "[]"),
         started_at=_parse_dt(row["started_at"]) or datetime.now(UTC),
         ended_at=_parse_dt(row["ended_at"]),
+        failures_encountered=row["failures_encountered"] if "failures_encountered" in keys else 0,
+        q_updates_count=row["q_updates_count"] if "q_updates_count" in keys else 0,
+        promotions_count=row["promotions_count"] if "promotions_count" in keys else 0,
     )
 
 
@@ -424,8 +428,9 @@ def insert_session(db: sqlite3.Connection, session: Session) -> int:
     cur = db.execute(
         """
         INSERT INTO sessions
-            (session_id, workspace_id, warnings_injected, started_at, ended_at)
-        VALUES (?,?,?,?,?)
+            (session_id, workspace_id, warnings_injected, started_at, ended_at,
+             failures_encountered, q_updates_count, promotions_count)
+        VALUES (?,?,?,?,?,?,?,?)
         """,
         (
             session.session_id,
@@ -433,6 +438,9 @@ def insert_session(db: sqlite3.Connection, session: Session) -> int:
             json.dumps(session.warnings_injected),
             _dt_str(session.started_at),
             _dt_str(session.ended_at),
+            session.failures_encountered,
+            session.q_updates_count,
+            session.promotions_count,
         ),
     )
     db.commit()
@@ -451,5 +459,32 @@ def update_session_end(db: sqlite3.Connection, session_id: str) -> None:
     db.execute(
         "UPDATE sessions SET ended_at = ? WHERE session_id = ?",
         (_dt_str(datetime.now(UTC)), session_id),
+    )
+    db.commit()
+
+
+def update_session_metrics(
+    db: sqlite3.Connection,
+    session_id: str,
+    failures_encountered: int,
+    q_updates_count: int,
+    promotions_count: int,
+) -> None:
+    db.execute(
+        """
+        UPDATE sessions SET
+            ended_at = ?,
+            failures_encountered = ?,
+            q_updates_count = ?,
+            promotions_count = ?
+        WHERE session_id = ?
+        """,
+        (
+            _dt_str(datetime.now(UTC)),
+            failures_encountered,
+            q_updates_count,
+            promotions_count,
+            session_id,
+        ),
     )
     db.commit()

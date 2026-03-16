@@ -470,6 +470,52 @@ class TestEdit:
         row = db.execute("SELECT avoid_hint FROM failures WHERE id = ?", (fid,)).fetchone()
         assert row["avoid_hint"] == "updated hint text"
 
+    def test_edit_decision_status_superseded(self, db, runner: CliRunner):
+        """status → superseded: Q EMA 업데이트 (reward=0.0)."""
+        did = insert_decision(db, Decision(workspace_id="default", statement="Use X", q=0.5))
+        result = _invoke(runner, db, ["edit", str(did), "--status", "superseded"])
+        assert result.exit_code == 0
+        assert "updated" in result.output.lower()
+        row = db.execute("SELECT q, status FROM decisions WHERE id = ?", (did,)).fetchone()
+        assert row["status"] == "superseded"
+        # Q should decrease toward 0: 0.5 + 0.1*(0.0 - 0.5) = 0.45
+        assert abs(row["q"] - 0.45) < 1e-9
+
+    def test_edit_decision_status_revisiting(self, db, runner: CliRunner):
+        """status → revisiting: Q EMA 업데이트 (reward=0.5)."""
+        did = insert_decision(db, Decision(workspace_id="default", statement="Use Y", q=0.5))
+        result = _invoke(runner, db, ["edit", str(did), "--status", "revisiting"])
+        assert result.exit_code == 0
+        row = db.execute("SELECT q, status FROM decisions WHERE id = ?", (did,)).fetchone()
+        assert row["status"] == "revisiting"
+        # Q = 0.5 + 0.1*(0.5 - 0.5) = 0.5 (no change, reward == current Q)
+        assert abs(row["q"] - 0.5) < 1e-9
+
+    def test_edit_decision_status_active(self, db, runner: CliRunner):
+        """status → active: Q EMA 업데이트 (reward=1.0)."""
+        did = insert_decision(
+            db, Decision(workspace_id="default", statement="Use Z", q=0.5, status="revisiting")
+        )
+        result = _invoke(runner, db, ["edit", str(did), "--status", "active"])
+        assert result.exit_code == 0
+        row = db.execute("SELECT q, status FROM decisions WHERE id = ?", (did,)).fetchone()
+        assert row["status"] == "active"
+        # Q = 0.5 + 0.1*(1.0 - 0.5) = 0.55
+        assert abs(row["q"] - 0.55) < 1e-9
+
+    def test_edit_decision_same_status_no_q_change(self, db, runner: CliRunner):
+        """동일 status로 변경 시 Q 업데이트 없음."""
+        did = insert_decision(db, Decision(workspace_id="default", statement="Same", q=0.7))
+        _invoke(runner, db, ["edit", str(did), "--status", "active"])
+        row = db.execute("SELECT q FROM decisions WHERE id = ?", (did,)).fetchone()
+        assert abs(row["q"] - 0.7) < 1e-9
+
+    def test_edit_decision_invalid_status(self, db, runner: CliRunner):
+        """잘못된 status 값은 오류 반환."""
+        did = insert_decision(db, Decision(workspace_id="default", statement="Bad status"))
+        result = _invoke(runner, db, ["edit", str(did), "--status", "unknown"])
+        assert result.exit_code == 1
+
 
 # ---------------------------------------------------------------------------
 # forge promote
@@ -552,6 +598,23 @@ class TestStats:
         result = _invoke(runner, db, ["stats", "--workspace", "myws"])
         assert result.exit_code == 0
         assert "myws" in result.output
+
+    def test_sessions_zero_when_no_sessions(self, db, runner: CliRunner):
+        result = _invoke(runner, db, ["stats"])
+        assert result.exit_code == 0
+        assert "Sessions:  0" in result.output
+
+    def test_sessions_stats_shown_when_sessions_exist(self, db, runner: CliRunner):
+        from forge.storage.queries import update_session_metrics
+        session = Session(session_id="sess-stat1", workspace_id="default")
+        insert_session(db, session)
+        update_session_metrics(db, "sess-stat1", 4, 2, 1)
+        result = _invoke(runner, db, ["stats"])
+        assert result.exit_code == 0
+        assert "Sessions:  1" in result.output
+        assert "Avg failures per session" in result.output
+        assert "Total Q-updates" in result.output
+        assert "Total promotions" in result.output
 
 
 # ---------------------------------------------------------------------------

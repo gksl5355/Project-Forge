@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 import sqlite3
+from datetime import UTC, datetime
+from pathlib import Path
 
 from forge.core.matcher import match_pattern
-from forge.storage.queries import list_failures
+from forge.storage.queries import list_failures, list_rules
+
+logger = logging.getLogger("forge")
+_RULES_LOG = Path.home() / ".forge" / "rules.log"
 
 
 def run_detect(
@@ -14,7 +20,7 @@ def run_detect(
     workspace_id: str,
     db: sqlite3.Connection,
 ) -> dict | None:
-    """Bash 실패 감지 → 기존 패턴 매칭 → hookSpecificOutput JSON 또는 None.
+    """Bash 실패 감지 → 규칙/패턴 매칭 → hookSpecificOutput JSON 또는 None.
 
     Returns:
         None if not a Bash failure or no match.
@@ -33,19 +39,67 @@ def run_detect(
         return None
 
     stderr = tool_response.get("stderr") or ""
+    command = tool_response.get("command") or ""
+
+    # Active rules: collect strongest match per enforcement mode
+    block_match = None
+    warn_match = None
+    log_match = None
+
+    for rule in list_rules(db, workspace_id):
+        if rule.rule_text in stderr or rule.rule_text in command:
+            if rule.enforcement_mode == "block" and block_match is None:
+                block_match = rule
+            elif rule.enforcement_mode == "warn" and warn_match is None:
+                warn_match = rule
+            elif rule.enforcement_mode == "log" and log_match is None:
+                log_match = rule
+
+    # Log-mode rules always write to log file
+    if log_match is not None:
+        _append_rules_log(log_match.rule_text, command, stderr)
+
+    # Failure pattern match
     failures = list_failures(db, workspace_id)
-    matched = match_pattern(stderr, failures)
+    matched_failure = match_pattern(stderr, failures)
 
-    if matched is None:
-        return None
-
-    additional_context = (
-        f"⚠️ Forge: {matched.pattern} 패턴 감지. "
-        f"{matched.avoid_hint} (Q: {matched.q:.2f})"
-    )
-    return {
-        "hookSpecificOutput": {
-            "hookEventName": "PostToolUse",
-            "additionalContext": additional_context,
+    # Return strongest match: block > warn > failure pattern
+    if block_match is not None:
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PostToolUse",
+                "additionalContext": f"[BLOCK] Forge Rule: {block_match.rule_text}",
+            }
         }
-    }
+    if warn_match is not None:
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PostToolUse",
+                "additionalContext": f"[WARN] Forge Rule: {warn_match.rule_text}",
+            }
+        }
+    if matched_failure is not None:
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PostToolUse",
+                "additionalContext": (
+                    f"⚠️ Forge: {matched_failure.pattern} 패턴 감지. "
+                    f"{matched_failure.avoid_hint} (Q: {matched_failure.q:.2f})"
+                ),
+            }
+        }
+    return None
+
+
+def _append_rules_log(rule_text: str, command: str, stderr: str) -> None:
+    """log 모드 규칙 매칭을 ~/.forge/rules.log에 기록."""
+    try:
+        _RULES_LOG.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(UTC).isoformat()
+        with _RULES_LOG.open("a", encoding="utf-8") as f:
+            f.write(
+                f"{timestamp} [LOG] Rule matched: {rule_text!r}"
+                f" | cmd={command!r} | stderr={stderr[:200]!r}\n"
+            )
+    except OSError:
+        logger.warning("Could not write to rules.log")

@@ -25,7 +25,7 @@ from forge.storage.queries import (
     insert_knowledge,
     list_failures,
     update_failure,
-    update_session_end,
+    update_session_metrics,
 )
 
 
@@ -179,7 +179,7 @@ def _do_writeback(
             print(f"[forge] Knowledge candidate: '{failure.pattern}' → '{knowledge.title}' (Q: {failure.q:.2f})")
             p_promotions += 1
 
-    # 5. 세션 종료 기록
-    update_session_end(db, session_id)
+    # 5. 세션 종료 기록 (impact metrics 포함)
+    update_session_metrics(db, session_id, n_failures, m_q_updates, p_promotions)
 
     print(f"[forge] Writeback: {n_failures} failures processed, {m_q_updates} Q-updates, {p_promotions} promotions")

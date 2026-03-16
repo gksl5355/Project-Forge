@@ -26,13 +26,14 @@ from forge.engines.detect import run_detect
 from forge.engines.resume import run_resume
 from forge.engines.transcript import BashFailure, parse_transcript
 from forge.engines.writeback import run_writeback
-from forge.storage.models import Decision, Failure, Knowledge, Session
+from forge.storage.models import Decision, Failure, Knowledge, Rule, Session
 from forge.storage.queries import (
     get_failure_by_pattern,
     get_session,
     insert_decision,
     insert_failure,
     insert_knowledge,
+    insert_rule,
     insert_session,
     list_failures,
     list_knowledge,
@@ -609,7 +610,7 @@ class TestWritebackTransaction:
         session = Session(session_id="sess-rb", workspace_id="ws_rb", warnings_injected=[])
         insert_session(db, session)
         with patch(
-            "forge.engines.writeback.update_session_end",
+            "forge.engines.writeback.update_session_metrics",
             side_effect=RuntimeError("forced failure"),
         ):
             with pytest.raises(RuntimeError, match="forced failure"):
@@ -959,3 +960,139 @@ class TestDetect:
         )
         assert result is not None
         assert "hookSpecificOutput" in result
+
+
+class TestDetectRuleEnforcement:
+    def test_block_rule_matched_in_stderr(self, db) -> None:
+        """block 모드 규칙이 stderr에 매칭 → [BLOCK] 접두사 반환."""
+        insert_rule(db, Rule(workspace_id="ws_rb1", rule_text="forbidden_cmd", enforcement_mode="block"))
+        result = run_detect("Bash", {"exit_code": 1, "stderr": "forbidden_cmd failed"}, "ws_rb1", db)
+        assert result is not None
+        ctx = result["hookSpecificOutput"]["additionalContext"]
+        assert ctx.startswith("[BLOCK]")
+        assert "forbidden_cmd" in ctx
+
+    def test_warn_rule_matched_in_stderr(self, db) -> None:
+        """warn 모드 규칙이 stderr에 매칭 → [WARN] 접두사 반환."""
+        insert_rule(db, Rule(workspace_id="ws_rw1", rule_text="raw_sql", enforcement_mode="warn"))
+        result = run_detect("Bash", {"exit_code": 1, "stderr": "raw_sql execution error"}, "ws_rw1", db)
+        assert result is not None
+        ctx = result["hookSpecificOutput"]["additionalContext"]
+        assert ctx.startswith("[WARN]")
+        assert "raw_sql" in ctx
+
+    def test_rule_matched_in_command(self, db) -> None:
+        """규칙 텍스트가 command에 포함 → 매칭."""
+        insert_rule(db, Rule(workspace_id="ws_rc1", rule_text="drop table", enforcement_mode="block"))
+        result = run_detect(
+            "Bash",
+            {"exit_code": 1, "command": "drop table users", "stderr": "syntax error"},
+            "ws_rc1",
+            db,
+        )
+        assert result is not None
+        assert "[BLOCK]" in result["hookSpecificOutput"]["additionalContext"]
+
+    def test_block_stronger_than_failure_pattern(self, db) -> None:
+        """block 규칙 + 실패 패턴 동시 매칭 → [BLOCK] 우선."""
+        insert_rule(db, Rule(workspace_id="ws_rbf", rule_text="forbidden", enforcement_mode="block"))
+        insert_failure(
+            db,
+            Failure(workspace_id="ws_rbf", pattern="value_error", avoid_hint="hint", hint_quality="near_miss", q=0.7),
+        )
+        result = run_detect(
+            "Bash",
+            {"exit_code": 1, "stderr": "forbidden ValueError: x"},
+            "ws_rbf",
+            db,
+        )
+        assert result is not None
+        assert "[BLOCK]" in result["hookSpecificOutput"]["additionalContext"]
+
+    def test_warn_stronger_than_failure_pattern(self, db) -> None:
+        """warn 규칙 + 실패 패턴 동시 매칭 → [WARN] 우선."""
+        insert_rule(db, Rule(workspace_id="ws_rwf", rule_text="no_raw_sql", enforcement_mode="warn"))
+        insert_failure(
+            db,
+            Failure(workspace_id="ws_rwf", pattern="value_error", avoid_hint="hint", hint_quality="near_miss", q=0.7),
+        )
+        result = run_detect(
+            "Bash",
+            {"exit_code": 1, "stderr": "no_raw_sql ValueError: x"},
+            "ws_rwf",
+            db,
+        )
+        assert result is not None
+        assert "[WARN]" in result["hookSpecificOutput"]["additionalContext"]
+
+    def test_log_rule_writes_to_log_file(self, db, tmp_path) -> None:
+        """log 모드 규칙 매칭 → rules.log에 기록."""
+        import forge.engines.detect as detect_mod
+        original = detect_mod._RULES_LOG
+        detect_mod._RULES_LOG = tmp_path / "rules.log"
+        try:
+            insert_rule(db, Rule(workspace_id="ws_rl1", rule_text="log_me", enforcement_mode="log"))
+            run_detect("Bash", {"exit_code": 1, "stderr": "log_me triggered"}, "ws_rl1", db)
+            assert (tmp_path / "rules.log").exists()
+            content = (tmp_path / "rules.log").read_text()
+            assert "log_me" in content
+            assert "[LOG]" in content
+        finally:
+            detect_mod._RULES_LOG = original
+
+    def test_log_rule_returns_failure_match(self, db, tmp_path) -> None:
+        """log 모드 규칙 + 실패 패턴 → 실패 패턴 반환 (log는 기록만)."""
+        import forge.engines.detect as detect_mod
+        original = detect_mod._RULES_LOG
+        detect_mod._RULES_LOG = tmp_path / "rules.log"
+        try:
+            insert_rule(db, Rule(workspace_id="ws_rl2", rule_text="log_token", enforcement_mode="log"))
+            insert_failure(
+                db,
+                Failure(workspace_id="ws_rl2", pattern="value_error", avoid_hint="hint", hint_quality="near_miss", q=0.5),
+            )
+            result = run_detect(
+                "Bash",
+                {"exit_code": 1, "stderr": "log_token ValueError: bad"},
+                "ws_rl2",
+                db,
+            )
+            assert result is not None
+            ctx = result["hookSpecificOutput"]["additionalContext"]
+            assert "value_error" in ctx
+            assert "[LOG]" not in ctx
+        finally:
+            detect_mod._RULES_LOG = original
+
+    def test_log_rule_only_returns_none(self, db, tmp_path) -> None:
+        """log 모드 규칙만 매칭 (실패 패턴 없음) → None 반환."""
+        import forge.engines.detect as detect_mod
+        original = detect_mod._RULES_LOG
+        detect_mod._RULES_LOG = tmp_path / "rules.log"
+        try:
+            insert_rule(db, Rule(workspace_id="ws_rl3", rule_text="only_log", enforcement_mode="log"))
+            result = run_detect("Bash", {"exit_code": 1, "stderr": "only_log triggered"}, "ws_rl3", db)
+            assert result is None
+        finally:
+            detect_mod._RULES_LOG = original
+
+    def test_no_rule_match_falls_through_to_failure(self, db) -> None:
+        """규칙 미매칭 → 실패 패턴 매칭으로 fallthrough."""
+        insert_rule(db, Rule(workspace_id="ws_rf2", rule_text="unrelated_token", enforcement_mode="block"))
+        insert_failure(
+            db,
+            Failure(workspace_id="ws_rf2", pattern="value_error", avoid_hint="hint", hint_quality="near_miss", q=0.7),
+        )
+        result = run_detect("Bash", {"exit_code": 1, "stderr": "ValueError: something"}, "ws_rf2", db)
+        assert result is not None
+        ctx = result["hookSpecificOutput"]["additionalContext"]
+        assert "value_error" in ctx
+        assert "[BLOCK]" not in ctx
+
+    def test_block_over_warn_rule(self, db) -> None:
+        """block + warn 규칙 동시 매칭 → block 우선."""
+        insert_rule(db, Rule(workspace_id="ws_rbw", rule_text="bad_token", enforcement_mode="block"))
+        insert_rule(db, Rule(workspace_id="ws_rbw", rule_text="bad_token", enforcement_mode="warn"))
+        result = run_detect("Bash", {"exit_code": 1, "stderr": "bad_token error"}, "ws_rbw", db)
+        assert result is not None
+        assert "[BLOCK]" in result["hookSpecificOutput"]["additionalContext"]

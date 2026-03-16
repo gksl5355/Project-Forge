@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 
 from forge.config import ForgeConfig
+
+logger = logging.getLogger("forge")
 from forge.core.context import build_context, format_decisions, format_knowledge
 from forge.storage.models import Decision, Failure, Knowledge, Session
 from forge.storage.queries import (
@@ -32,6 +35,11 @@ def run_resume(
     failures = list(seen_patterns.values())
 
     rules = list_rules(db, workspace_id)
+    if rules:
+        b = sum(1 for r in rules if r.enforcement_mode == "block")
+        w = sum(1 for r in rules if r.enforcement_mode == "warn")
+        l = sum(1 for r in rules if r.enforcement_mode == "log")
+        logger.info("[forge] %d active rules loaded (%d block, %d warn, %d log)", len(rules), b, w, l)
     decisions = list_decisions(db, workspace_id, status="active")
 
     raw_knowledge = list_knowledge(db, workspace_id, include_global=True)

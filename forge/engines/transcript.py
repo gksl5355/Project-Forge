@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger("forge")
 
 
 @dataclass
@@ -28,15 +31,17 @@ def parse_transcript(path: Path) -> list[BashFailure]:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
+        logger.warning("Transcript file unreadable: %s", path)
         return []
 
-    for line in lines:
+    for line_num, line in enumerate(lines, start=1):
         line = line.strip()
         if not line:
             continue
         try:
             obj = json.loads(line)
         except json.JSONDecodeError:
+            logger.debug("Skipping malformed JSON line %d in %s", line_num, path)
             continue
 
         failure = _extract_bash_failure(obj)

@@ -5,13 +5,13 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 
 _SCHEMA_SQL = """
 CREATE TABLE schema_version (
     version INTEGER NOT NULL
 );
-INSERT INTO schema_version VALUES (1);
+INSERT INTO schema_version VALUES (2);
 
 CREATE TABLE failures (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,7 +79,10 @@ CREATE TABLE sessions (
     workspace_id    TEXT NOT NULL,
     warnings_injected TEXT DEFAULT '[]',
     started_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-    ended_at        DATETIME
+    ended_at        DATETIME,
+    failures_encountered INTEGER DEFAULT 0,
+    q_updates_count INTEGER DEFAULT 0,
+    promotions_count INTEGER DEFAULT 0
 );
 
 CREATE INDEX idx_failures_ws_q ON failures(workspace_id, q DESC);
@@ -129,8 +132,17 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
 
 
 def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
-    """Apply incremental migrations. Extend as schema evolves."""
-    # No migrations needed for v1 → future versions add ALTER TABLE here
+    """Apply incremental migrations."""
+    if from_version < 2:
+        conn.execute(
+            "ALTER TABLE sessions ADD COLUMN failures_encountered INTEGER DEFAULT 0"
+        )
+        conn.execute(
+            "ALTER TABLE sessions ADD COLUMN q_updates_count INTEGER DEFAULT 0"
+        )
+        conn.execute(
+            "ALTER TABLE sessions ADD COLUMN promotions_count INTEGER DEFAULT 0"
+        )
     conn.execute(
         "UPDATE schema_version SET version = ?", (CURRENT_SCHEMA_VERSION,)
     )

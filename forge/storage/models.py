@@ -76,4 +76,7 @@ class Session:
     warnings_injected: list[str] = field(default_factory=list)
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     ended_at: datetime | None = None
+    failures_encountered: int = 0
+    q_updates_count: int = 0
+    promotions_count: int = 0
     id: int | None = None

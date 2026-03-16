@@ -12,7 +12,7 @@ import typer
 
 from forge.config import load_config
 from forge.core.promote import promote_to_global, promote_to_knowledge
-from forge.core.qvalue import initial_q, time_decay
+from forge.core.qvalue import ema_update, initial_q, time_decay
 from forge.engines.detect import run_detect
 from forge.engines.resume import run_resume
 from forge.engines.writeback import run_writeback
@@ -275,6 +275,9 @@ def cmd_edit(
     workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
     hint: Optional[str] = typer.Option(None, "--hint", help="새 avoid_hint (failure용)"),
     rationale: Optional[str] = typer.Option(None, "--rationale", help="새 rationale (decision용)"),
+    status: Optional[str] = typer.Option(
+        None, "--status", help="새 status (decision용): active | superseded | revisiting"
+    ),
 ):
     """기록 편집."""
     db = get_connection()
@@ -293,12 +296,33 @@ def cmd_edit(
     # Decision 시도
     decision = get_decision_by_id(db, id_, workspace)
     if decision:
-        if not rationale:
-            typer.echo("No changes requested. Use --rationale to update rationale.", err=True)
+        if not rationale and not status:
+            typer.echo(
+                "No changes requested. Use --rationale or --status to update.", err=True
+            )
             return
-        decision.rationale = rationale
+
+        if rationale:
+            decision.rationale = rationale
+
+        if status:
+            valid_statuses = {"active", "superseded", "revisiting"}
+            if status not in valid_statuses:
+                typer.echo(f"Error: status must be one of {valid_statuses}", err=True)
+                raise typer.Exit(1)
+            if status != decision.status:
+                config = load_config()
+                if status == "superseded":
+                    reward = 0.0
+                elif status == "revisiting":
+                    reward = 0.5
+                else:  # active
+                    reward = 1.0
+                decision.q = ema_update(decision.q, reward, config.alpha)
+                decision.status = status
+
         update_decision(db, decision)
-        typer.echo(f"Decision {id_} rationale updated.")
+        typer.echo(f"Decision {id_} updated.")
         return
 
     typer.echo(f"Item {id_} not found in workspace '{workspace}'", err=True)
@@ -379,6 +403,24 @@ def cmd_stats(
     typer.echo(f"  Decisions: {len(decisions)}")
     typer.echo(f"  Rules:     {len(rules)}")
     typer.echo(f"  Knowledge: {len(knowledge)}")
+
+    row = db.execute(
+        """
+        SELECT COUNT(*) as cnt,
+               AVG(failures_encountered) as avg_f,
+               SUM(q_updates_count) as sum_q,
+               SUM(promotions_count) as sum_p
+        FROM sessions WHERE workspace_id = ?
+        """,
+        (workspace,),
+    ).fetchone()
+    total_sessions = row["cnt"] if row else 0
+    typer.echo(f"  Sessions:  {total_sessions}")
+    if total_sessions > 0:
+        avg_f = row["avg_f"] or 0.0
+        typer.echo(f"  Avg failures per session: {avg_f:.1f}")
+        typer.echo(f"  Total Q-updates: {row['sum_q'] or 0}")
+        typer.echo(f"  Total promotions: {row['sum_p'] or 0}")
 
 
 # ---------------------------------------------------------------------------
