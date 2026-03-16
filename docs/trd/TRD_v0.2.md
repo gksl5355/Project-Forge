@@ -311,7 +311,7 @@ forge list --workspace --type --sort          → storage/queries.py
 forge search --tag --workspace                → storage/queries.py
 forge detail <pattern>                        → storage/queries.py
 forge edit <id> --hint/--rationale            → storage/queries.py
-forge promote <id> [--to knowledge]           → core/promote.py + storage/queries.py
+forge promote <id> [--to-knowledge]           → core/promote.py + storage/queries.py
 forge stats                                   → core/qvalue.py + storage/queries.py
 forge decay --dry-run                         → core/qvalue.py
 forge resume --workspace                      → engines/resume.py (hook용)

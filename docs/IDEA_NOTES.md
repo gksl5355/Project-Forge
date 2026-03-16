@@ -160,7 +160,7 @@ SQLite 하나에 workspace_id로 구분:
 - 생성 경로:
   - **수동 시딩**: `forge record knowledge` 명령으로 직접 등록
   - **failure → knowledge 승격**: Q > 0.8이고 times_helped >= 5이면 knowledge 후보로 제안
-  - 자동 생성은 하지 않음. 사용자가 확인 후 승격 (`forge promote <failure_id> --to knowledge`)
+  - 자동 생성은 하지 않음. 사용자가 확인 후 승격 (`forge promote <failure_id> --to-knowledge`)
 
 ### 3. Q값 갱신 (MemRL EMA 방식)
 
@@ -424,7 +424,7 @@ forge list --global --type knowledge
 # 관리
 forge edit <id> --hint "수정된 힌트"
 forge promote <id>                    # 수동 전역 승격
-forge promote <id> --to knowledge     # failure → knowledge 승격
+forge promote <id> --to-knowledge     # failure → knowledge 승격
 forge stats                           # 프로젝트별 기억 수, Q 분포
 forge decay --dry-run                 # 감쇠 시뮬레이션
 ```
@@ -529,7 +529,7 @@ environmental failure: "외부 API 타임아웃"
 
 → writeback에서 승격 조건 충족 (Q >= 0.8, helped >= 5)
 → 로그: "failure 'async_connection_leak'가 knowledge 승격 후보입니다"
-→ 사용자: forge promote <id> --to knowledge
+→ 사용자: forge promote <id> --to-knowledge
 → knowledge로 저장:
     title: "FastAPI async session scope 관리"
     content: avoid_hint 내용 + 발생 히스토리 요약
