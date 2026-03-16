@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "project-forge"
+version = "0.1.0"
+description = "Experience learning CLI for coding agents"
+requires-python = ">=3.10"
+dependencies = [
+    "typer>=0.12",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov",
+]
+
+[project.scripts]
+forge = "forge.cli:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,6 @@
+{"tool_name": "Bash", "command": "ls -la", "exit_code": 0, "stdout": "total 8\ndrwxr-xr-x 2 user user 4096 Mar 16 00:00 .", "stderr": ""}
+{"tool_name": "Bash", "command": "python -c 'import nonexistent_module'", "exit_code": 1, "stdout": "", "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nModuleNotFoundError: No module named 'nonexistent_module'"}
+{"tool_name": "Read", "exit_code": 0, "stdout": "file contents", "stderr": ""}
+{"tool_name": "Bash", "command": "git push origin main", "exit_code": 128, "stdout": "", "stderr": "error: failed to push some refs to 'origin'\nhint: Updates were rejected because the remote contains work that you do not have locally."}
+{"invalid json line this should be skipped"}
+{"tool_name": "Bash", "command": "make build", "exit_code": 2, "stdout": "", "stderr": "make: *** No rule to make target 'build'. Stop."}
