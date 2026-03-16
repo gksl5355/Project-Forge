@@ -87,7 +87,12 @@ def cmd_record_failure(
         likely_cause=cause,
         source="manual",
     )
-    fid = insert_failure(db, failure)
+    import sqlite3 as _sqlite3
+    try:
+        fid = insert_failure(db, failure)
+    except _sqlite3.IntegrityError:
+        typer.echo(f"Pattern '{pattern}' already exists in workspace '{workspace}'. Use 'forge edit' to update.", err=True)
+        raise typer.Exit(1)
     typer.echo(f"Failure recorded (id={fid}): {pattern}")
 
 
