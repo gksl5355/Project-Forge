@@ -622,35 +622,5 @@ def cmd_dedup(
         typer.echo(f"\n{len(results)} duplicate pair(s) found. Use --auto to merge automatically.")
 
 
-# ---------------------------------------------------------------------------
-# forge debate (v2: 외부 LLM 검토)
-# ---------------------------------------------------------------------------
-
-@app.command("debate")
-def cmd_debate(
-    topic: str = typer.Argument(..., help="토론 주제 (예: 'JWT vs Session Auth')"),
-    workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
-    no_save: bool = typer.Option(False, "--no-save", help="결과를 forge.db에 저장하지 않음"),
-):
-    """외부 LLM을 이용한 설계 검토 (Adversarial Review)."""
-    from forge.engines.debate import run_debate
-
-    db = init_db()
-    config = load_config()
-    result = run_debate(topic, workspace, db, config, save_result=not no_save)
-
-    typer.echo(f"\n{'='*60}")
-    typer.echo(f"Debate: {result.topic}")
-    typer.echo(f"Rounds: {result.rounds} | BLOCKs: {result.has_blocks}")
-    typer.echo(f"{'='*60}")
-
-    for c in result.critiques:
-        typer.echo(f"  [{c['severity']}] {c['category']}: {c['summary']}")
-
-    typer.echo(f"\nFull result: {result.result_path}")
-    if result.decision_id:
-        typer.echo(f"Saved as decision id={result.decision_id}")
-
-
 if __name__ == "__main__":
     app()
