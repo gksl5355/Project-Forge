@@ -533,6 +533,17 @@ def update_session_end(db: sqlite3.Connection, session_id: str) -> None:
     db.commit()
 
 
+def list_sessions(
+    db: sqlite3.Connection, workspace_id: str
+) -> list[Session]:
+    """List all sessions for a workspace, ordered by most recent first."""
+    rows = db.execute(
+        "SELECT * FROM sessions WHERE workspace_id = ? ORDER BY started_at DESC",
+        (workspace_id,),
+    ).fetchall()
+    return [_row_to_session(r) for r in rows]
+
+
 def update_session_metrics(
     db: sqlite3.Connection,
     session_id: str,

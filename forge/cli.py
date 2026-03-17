@@ -629,5 +629,64 @@ def cmd_dedup(
         typer.echo(f"\n{len(results)} duplicate pair(s) found. Use --auto to merge automatically.")
 
 
+# ---------------------------------------------------------------------------
+# forge optimize (AutoResearch)
+# ---------------------------------------------------------------------------
+
+@app.command("optimize")
+def cmd_optimize(
+    workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
+    max_experiments: int = typer.Option(50, "--max-experiments", help="최대 실험 횟수"),
+    strategy: str = typer.Option("greedy", "--strategy", help="탐색 전략 (greedy)"),
+    save_best: bool = typer.Option(False, "--save-best", help="최적 설정을 config.yml에 저장"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="저장하지 않고 결과만 표시"),
+):
+    """컨텍스트 설정 자동 최적화 (AutoResearch)."""
+    from forge.engines.optimizer import PARAM_GRID, run_autoresearch
+
+    db = get_connection()
+    config = load_config()
+
+    failures_count = len(list_failures(db, workspace, include_global=False))
+
+    def on_progress(step, total, desc, result, improved):
+        marker = " IMPROVED" if improved else ""
+        typer.echo(f"[{step}/{total}] {desc} -> QWHR: {result.qwhr:.2f}{marker}")
+
+    typer.echo(f"Optimizing with {failures_count} failures...")
+
+    result = run_autoresearch(
+        workspace, db, config, max_experiments, strategy,
+        on_progress=on_progress,
+    )
+
+    if result.baseline.sessions_evaluated == 0:
+        typer.echo("Need at least 1 session with warnings data.")
+        return
+
+    typer.echo(f"\n=== Results ===")
+    typer.echo(f"Baseline QWHR: {result.baseline.qwhr:.2f}")
+    if result.baseline.qwhr > 0:
+        pct = (result.best.qwhr - result.baseline.qwhr) / result.baseline.qwhr * 100
+        typer.echo(f"Best QWHR:     {result.best.qwhr:.2f} ({pct:+.0f}%)")
+    else:
+        typer.echo(f"Best QWHR:     {result.best.qwhr:.2f}")
+    typer.echo(f"Experiments:   {result.total_experiments}")
+
+    typer.echo(f"\n=== Recommended Config ===")
+    for param in PARAM_GRID:
+        baseline_val = getattr(result.baseline.config, param)
+        best_val = getattr(result.best.config, param)
+        marker = " *" if baseline_val != best_val else ""
+        typer.echo(f"  {param}: {best_val}{marker}")
+
+    if save_best and not dry_run and result.improved:
+        from forge.config import save_config_yaml
+        save_config_yaml(result.best.config)
+        typer.echo(f"\nConfig saved to ~/.forge/config.yml")
+    elif not result.improved:
+        typer.echo(f"\nCurrent config is already optimal.")
+
+
 if __name__ == "__main__":
     app()

@@ -73,6 +73,20 @@ def load_config(path: Path | None = None) -> ForgeConfig:
     return _validate_config(config)
 
 
+def save_config_yaml(config: ForgeConfig, path: Path | None = None) -> None:
+    """Save config to YAML file. Only writes non-default values."""
+    config_path = path or _DEFAULT_CONFIG_PATH
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    defaults = ForgeConfig()
+    data: dict[str, object] = {}
+    for name in ForgeConfig.__dataclass_fields__:
+        val = getattr(config, name)
+        if val != getattr(defaults, name):
+            data[name] = val
+    with config_path.open("w", encoding="utf-8") as f:
+        yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
+
+
 def _validate_config(config: ForgeConfig) -> ForgeConfig:
     """Validate and clamp config values to valid ranges."""
     # Clamp learning parameters to [0.0, 1.0]
