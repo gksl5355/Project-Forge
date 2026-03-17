@@ -278,11 +278,11 @@ project-forge/
 ## 5. SQLite 스키마
 
 ```sql
--- 스키마 버전 관리
+-- 스키마 버전 관리 (v2)
 CREATE TABLE schema_version (
     version INTEGER NOT NULL
 );
-INSERT INTO schema_version VALUES (1);
+INSERT INTO schema_version VALUES (2);
 
 CREATE TABLE failures (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -350,7 +350,10 @@ CREATE TABLE sessions (
     workspace_id    TEXT NOT NULL,
     warnings_injected TEXT DEFAULT '[]',
     started_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-    ended_at        DATETIME
+    ended_at        DATETIME,
+    failures_encountered INTEGER DEFAULT 0,
+    q_updates_count INTEGER DEFAULT 0,
+    promotions_count INTEGER DEFAULT 0
 );
 
 CREATE INDEX idx_failures_ws_q ON failures(workspace_id, q DESC);
@@ -404,7 +407,7 @@ sqlite3: Python 내장, 외부 ORM 불필요.
 
 ## 7. 기술 요구사항
 
-- Python 3.11+
+- Python 3.12+
 - sqlite3 (내장)
 - typer (CLI)
 - pyyaml (config)

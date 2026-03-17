@@ -1,5 +1,7 @@
 # Project Forge — PRD v0.1 + Claude Code Reference Pack
 
+> ⚠️ **DEPRECATED**: This document describes the initial server-based design (FastAPI + PostgreSQL). The project has pivoted to a CLI-first approach. See [PRD v0.2](PRD_v0.2.md) and related v0.2 documents for the current design.
+
 ## 문서 목적
 
 이 문서는 **코딩 에이전트용 stateful memory runtime** 프로젝트의 초기 제품 정의서(PRD)와, Claude Code에 함께 넣어 설계/구현 참고자료로 활용할 컨텍스트 및 링크를 하나로 묶은 문서다.

@@ -8,13 +8,13 @@ from pathlib import Path
 
 logger = logging.getLogger("forge")
 
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 4
 
 _SCHEMA_SQL = """
 CREATE TABLE schema_version (
     version INTEGER NOT NULL
 );
-INSERT INTO schema_version VALUES (3);
+INSERT INTO schema_version VALUES (4);
 
 CREATE TABLE failures (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,7 +86,10 @@ CREATE TABLE sessions (
     ended_at        DATETIME,
     failures_encountered INTEGER DEFAULT 0,
     q_updates_count INTEGER DEFAULT 0,
-    promotions_count INTEGER DEFAULT 0
+    promotions_count INTEGER DEFAULT 0,
+    config_hash TEXT,
+    document_hash TEXT,
+    unified_fitness REAL
 );
 
 CREATE TABLE team_runs (
@@ -104,11 +107,34 @@ CREATE TABLE team_runs (
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE experiments (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id        TEXT NOT NULL,
+    experiment_type     TEXT NOT NULL DEFAULT 'auto',
+    config_snapshot     TEXT NOT NULL,
+    config_hash         TEXT NOT NULL,
+    document_hashes     TEXT NOT NULL,
+    document_hash       TEXT NOT NULL,
+    unified_fitness     REAL NOT NULL,
+    qwhr                REAL,
+    token_efficiency    REAL,
+    promotion_precision REAL,
+    to_success_rate     REAL,
+    to_retry_rate       REAL,
+    to_scope_violations REAL,
+    sessions_evaluated  INTEGER DEFAULT 0,
+    team_runs_evaluated INTEGER DEFAULT 0,
+    notes               TEXT,
+    recorded_at         DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX idx_failures_ws_q ON failures(workspace_id, q DESC);
 CREATE INDEX idx_decisions_ws_status ON decisions(workspace_id, status);
 CREATE INDEX idx_knowledge_ws_q ON knowledge(workspace_id, q DESC);
 CREATE INDEX idx_rules_ws_active ON rules(workspace_id, active);
 CREATE INDEX idx_team_runs_ws ON team_runs(workspace_id);
+CREATE INDEX idx_exp_ws_fitness ON experiments(workspace_id, unified_fitness DESC);
+CREATE INDEX idx_exp_ws_time ON experiments(workspace_id, recorded_at DESC);
 
 CREATE TABLE IF NOT EXISTS forge_meta (
     key        TEXT PRIMARY KEY,
@@ -216,6 +242,39 @@ def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
             """)
         except sqlite3.OperationalError:
             logger.info("sqlite-vec not available; vector search disabled")
+
+    if from_version < 4:
+        # experiments table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS experiments (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                workspace_id        TEXT NOT NULL,
+                experiment_type     TEXT NOT NULL DEFAULT 'auto',
+                config_snapshot     TEXT NOT NULL,
+                config_hash         TEXT NOT NULL,
+                document_hashes     TEXT NOT NULL,
+                document_hash       TEXT NOT NULL,
+                unified_fitness     REAL NOT NULL,
+                qwhr                REAL,
+                token_efficiency    REAL,
+                promotion_precision REAL,
+                to_success_rate     REAL,
+                to_retry_rate       REAL,
+                to_scope_violations REAL,
+                sessions_evaluated  INTEGER DEFAULT 0,
+                team_runs_evaluated INTEGER DEFAULT 0,
+                notes               TEXT,
+                recorded_at         DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_exp_ws_fitness ON experiments(workspace_id, unified_fitness DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_exp_ws_time ON experiments(workspace_id, recorded_at DESC)")
+        # sessions extensions
+        for col, ctype in [("config_hash", "TEXT"), ("document_hash", "TEXT"), ("unified_fitness", "REAL")]:
+            try:
+                conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {ctype}")
+            except sqlite3.OperationalError:
+                pass
 
     conn.execute(
         "UPDATE schema_version SET version = ?", (CURRENT_SCHEMA_VERSION,)

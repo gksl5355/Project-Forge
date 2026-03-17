@@ -1,4 +1,4 @@
-"""Hook 설치: ~/.claude/settings.json 패치."""
+"""Hook installation and full Forge setup."""
 
 from __future__ import annotations
 
@@ -8,23 +8,22 @@ from pathlib import Path
 
 _SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
 _HOOKS_DIR = Path.home() / ".forge" / "hooks"
-
 _HOOK_TEMPLATES = Path(__file__).parent / "templates"
 
 
 def install_hooks() -> None:
-    """Claude Code settings.json에 hook 설정 추가 + 스크립트 복사."""
+    """Install Forge hooks into Claude Code settings.json + copy scripts."""
     _HOOKS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 스크립트 복사
-    for script_name in ("resume.sh", "writeback.sh", "detect.sh"):
+    # Copy hook scripts
+    for script_name in ("resume.sh", "writeback.sh", "detect.sh", "teammate.sh"):
         src = _HOOK_TEMPLATES / script_name
         dst = _HOOKS_DIR / script_name
         if src.exists():
             shutil.copy2(src, dst)
             dst.chmod(0o755)
 
-    # settings.json 로드 또는 새로 생성
+    # Load or create settings.json
     if _SETTINGS_PATH.exists():
         try:
             settings = json.loads(_SETTINGS_PATH.read_text(encoding="utf-8"))
@@ -34,6 +33,7 @@ def install_hooks() -> None:
         _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
         settings = {}
 
+    # --- Hooks ---
     hooks = settings.setdefault("hooks", {})
 
     # SessionStart → resume.sh
@@ -54,7 +54,7 @@ def install_hooks() -> None:
             "hooks": [{"type": "command", "command": writeback_cmd}],
         })
 
-    # PostToolUse → detect.sh (Bash 툴에만 매칭)
+    # PostToolUse → detect.sh (Bash only)
     post_tool = hooks.setdefault("PostToolUse", [])
     detect_cmd = str(_HOOKS_DIR / "detect.sh")
     if not _entry_exists(post_tool, detect_cmd):
@@ -63,6 +63,16 @@ def install_hooks() -> None:
             "hooks": [{"type": "command", "command": detect_cmd}],
         })
 
+    # --- Env vars for Agent Teams ---
+    env = settings.setdefault("env", {})
+    teammate_path = str(_HOOKS_DIR / "teammate.sh")
+    env.setdefault("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1")
+    # Update teammate command to Forge-managed version
+    current_teammate = env.get("CLAUDE_CODE_TEAMMATE_COMMAND", "")
+    if not current_teammate or "forge" not in current_teammate:
+        env["CLAUDE_CODE_TEAMMATE_COMMAND"] = teammate_path
+
+    # Write settings
     try:
         _SETTINGS_PATH.write_text(
             json.dumps(settings, indent=2, ensure_ascii=False),

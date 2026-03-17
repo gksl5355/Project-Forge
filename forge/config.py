@@ -52,6 +52,11 @@ class ForgeConfig:
     dedup_interval_days: int = 0      # 0=disabled, >0=auto dedup after N days
     # v2: auto ingest
     auto_ingest_enabled: bool = True
+    # v4: team routing thresholds (used by spawn-team SKILL.md)
+    routing_n_parallel_min: int = 3
+    routing_n_files_min: int = 5
+    routing_loc_threshold: int = 200
+    max_agents: int = 5
 
 
 _DEFAULT_CONFIG_PATH = Path.home() / ".forge" / "config.yml"
@@ -132,5 +137,13 @@ def _validate_config(config: ForgeConfig) -> ForgeConfig:
         config.debate_max_rounds = 2
     if config.dedup_interval_days < 0:
         config.dedup_interval_days = 0
+    if config.routing_n_parallel_min <= 0:
+        config.routing_n_parallel_min = 3
+    if config.routing_n_files_min <= 0:
+        config.routing_n_files_min = 5
+    if config.routing_loc_threshold <= 0:
+        config.routing_loc_threshold = 200
+    if config.max_agents <= 0:
+        config.max_agents = 5
 
     return config

@@ -47,9 +47,32 @@ forge/
 - Architecture: `docs/architecture/ARCHITECTURE_v0.2.md`
 - TRD: `docs/trd/TRD_v0.2.md`
 
+## Forge + TO Integration
+
+Forge is the **single source of truth** for all team orchestration learning.
+
+**Data flow:**
+```
+spawn-team run → report.yml + events.yml → forge ingest → forge.db → forge resume/recommend
+```
+
+- `forge ingest`: reads report.yml/events.yml → TeamRun, Failure, Knowledge
+- `forge resume --team-brief`: Q-ranked team failures + recent runs
+- `forge recommend --complexity X`: best team config based on past runs
+- `forge measure`: includes TO metrics (avg success/retry/scope_violations, best configs per complexity)
+- `writeback.sh` auto-ingests TO data on session end (background, non-blocking)
+
 ## Silo Ownership (for team development)
 
 - **Silo A (Storage + Config)**: forge/config.py, forge/storage/*
 - **Silo B (Core Services)**: forge/core/*
 - **Silo C (Engines + CLI + Hooks)**: forge/cli.py, forge/engines/*, forge/hooks/*
 - **Shared**: tests/conftest.py, pyproject.toml, CLAUDE.md
+
+## Experiment Tracking (v4)
+
+- Schema v4: `experiments` table + `sessions` extension (config_hash, document_hash, unified_fitness)
+- Unified fitness: auto-interpolates forge-only (0.6*QWHR+0.25*TokenEff+0.15*PromoPrecision) and TO-integrated modes
+- Config/document hashing: SHA256[:12] for change detection
+- Directive model: atomic document decomposition (rule, threshold, workflow, description, constraint)
+- CLI: `forge trend`, `forge research`, `forge measure` (unified_fitness output)

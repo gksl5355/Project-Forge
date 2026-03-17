@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from forge.config import ForgeConfig
+from forge.core.hashing import compute_config_hash, compute_combined_doc_hash, compute_doc_hashes
 from forge.core.matcher import match_pattern, suggest_pattern_name
 from forge.core.promote import (
     check_global_promote,
@@ -17,6 +18,7 @@ from forge.core.promote import (
     promote_to_knowledge,
 )
 from forge.core.qvalue import ema_update, initial_q, time_decay
+from forge.engines.fitness import compute_unified_fitness
 from forge.engines.transcript import parse_transcript
 from forge.storage.models import Decision, Failure, Knowledge
 from forge.storage.queries import (
@@ -201,6 +203,9 @@ def _do_writeback(
     # 5. 세션 종료 기록 (impact metrics 포함)
     update_session_metrics(db, session_id, n_failures, m_q_updates, p_promotions)
 
+    # 5.1 Record experiment with unified fitness
+    _record_experiment(workspace_id, db, config)
+
     logger.info("Writeback: %d failures processed, %d Q-updates, %d promotions", n_failures, m_q_updates, p_promotions)
 
 
@@ -339,3 +344,50 @@ def _auto_ingest_step(
             logger.info("Auto ingest: %d runs, %d failures, %d knowledge", counts['team_runs'], counts['failures'], counts['knowledge'])
     except Exception as e:
         logger.warning("Auto ingest skipped: %s", e)
+
+
+def _record_experiment(
+    workspace_id: str,
+    db: Any,
+    config: ForgeConfig,
+) -> None:
+    """Record an experiment entry with current fitness metrics."""
+    import json as json_mod
+    from forge.engines.measure import run_measure
+    from forge.storage.models import Experiment
+    from forge.storage.queries import insert_experiment
+
+    try:
+        result = run_measure(workspace_id, db, config)
+
+        config_hash = compute_config_hash(config)
+        doc_hashes = compute_doc_hashes(
+            Path(workspace_id) if Path(workspace_id).is_dir() else None
+        )
+        doc_hash = compute_combined_doc_hash(doc_hashes)
+
+        experiment = Experiment(
+            workspace_id=workspace_id,
+            experiment_type="auto",
+            config_snapshot=json_mod.dumps({
+                "alpha": config.alpha,
+                "decay_daily": config.decay_daily,
+                "l0_max_entries": config.l0_max_entries,
+                "forge_context_tokens": config.forge_context_tokens,
+            }),
+            config_hash=config_hash,
+            document_hashes=doc_hashes,
+            document_hash=doc_hash,
+            unified_fitness=result.unified_fitness,
+            qwhr=result.qwhr,
+            token_efficiency=result.helped_per_1k_tokens / 1000.0 if result.helped_per_1k_tokens > 0 else 0.0,
+            promotion_precision=result.promotion_precision,
+            to_success_rate=result.to_avg_success_rate,
+            to_retry_rate=result.to_avg_retry_rate,
+            to_scope_violations=result.to_avg_scope_violations,
+            sessions_evaluated=result.total_sessions,
+            team_runs_evaluated=result.to_total_runs,
+        )
+        insert_experiment(db, experiment)
+    except Exception as e:
+        logger.warning("Failed to record experiment: %s", e)

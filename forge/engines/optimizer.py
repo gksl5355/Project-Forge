@@ -10,6 +10,7 @@ from typing import Callable, Iterator
 
 from forge.config import ForgeConfig
 from forge.core.context import build_context, estimate_tokens, trim_to_budget
+from forge.engines.fitness import compute_unified_fitness
 from forge.storage.models import Failure, Session
 from forge.storage.queries import (
     list_decisions,
@@ -121,12 +122,15 @@ def compute_composite_fitness(
     token_efficiency: float,
     promotion_precision: float,
 ) -> float:
-    """Composite fitness = 0.6*QWHR + 0.25*token_eff_norm + 0.15*promo_precision.
+    """Composite fitness — delegates to unified fitness (forge-only mode).
 
     token_efficiency is normalized: min(1.0, token_efficiency * 100).
     """
-    token_eff_norm = min(1.0, token_efficiency * 100)
-    return 0.6 * qwhr + 0.25 * token_eff_norm + 0.15 * promotion_precision
+    return compute_unified_fitness(
+        qwhr=qwhr,
+        token_efficiency=token_efficiency,
+        promotion_precision=promotion_precision,
+    )
 
 
 def compute_qwhr(

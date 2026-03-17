@@ -1,5 +1,7 @@
 # Project Forge — Architecture v0.1
 
+> ⚠️ **DEPRECATED**: This document describes the initial server-based design (FastAPI + PostgreSQL + Qdrant). The project has pivoted to a CLI-first approach. See [ARCHITECTURE v0.2](ARCHITECTURE_v0.2.md) and related v0.2 documents for the current design.
+
 ## 1. 아키텍처 비전
 
 Project Forge는 **도메인 중립 experience runtime**이다.

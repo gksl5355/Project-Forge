@@ -7,7 +7,7 @@ import logging
 import sqlite3
 from datetime import datetime, UTC
 
-from forge.storage.models import Decision, Failure, Knowledge, Rule, Session, TeamRun
+from forge.storage.models import Decision, Experiment, Failure, Knowledge, Rule, Session, TeamRun
 
 logger = logging.getLogger("forge")
 
@@ -491,6 +491,9 @@ def _row_to_session(row: sqlite3.Row) -> Session:
         failures_encountered=row["failures_encountered"] if "failures_encountered" in keys else 0,
         q_updates_count=row["q_updates_count"] if "q_updates_count" in keys else 0,
         promotions_count=row["promotions_count"] if "promotions_count" in keys else 0,
+        config_hash=row["config_hash"] if "config_hash" in keys else None,
+        document_hash=row["document_hash"] if "document_hash" in keys else None,
+        unified_fitness=row["unified_fitness"] if "unified_fitness" in keys else None,
     )
 
 
@@ -499,8 +502,9 @@ def insert_session(db: sqlite3.Connection, session: Session) -> int:
         """
         INSERT INTO sessions
             (session_id, workspace_id, warnings_injected, started_at, ended_at,
-             failures_encountered, q_updates_count, promotions_count)
-        VALUES (?,?,?,?,?,?,?,?)
+             failures_encountered, q_updates_count, promotions_count,
+             config_hash, document_hash, unified_fitness)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)
         """,
         (
             session.session_id,
@@ -511,6 +515,9 @@ def insert_session(db: sqlite3.Connection, session: Session) -> int:
             session.failures_encountered,
             session.q_updates_count,
             session.promotions_count,
+            session.config_hash,
+            session.document_hash,
+            session.unified_fitness,
         ),
     )
     db.commit()
@@ -680,3 +687,90 @@ def set_meta(db: sqlite3.Connection, key: str, value: str) -> None:
         (key, value, _dt_str(datetime.now(UTC))),
     )
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Experiment
+# ---------------------------------------------------------------------------
+
+def _row_to_experiment(row: sqlite3.Row) -> Experiment:
+    return Experiment(
+        id=row["id"],
+        workspace_id=row["workspace_id"],
+        experiment_type=row["experiment_type"],
+        config_snapshot=row["config_snapshot"],
+        config_hash=row["config_hash"],
+        document_hashes=_safe_json_loads(row["document_hashes"], default={}),
+        document_hash=row["document_hash"],
+        unified_fitness=row["unified_fitness"],
+        qwhr=row["qwhr"],
+        token_efficiency=row["token_efficiency"],
+        promotion_precision=row["promotion_precision"],
+        to_success_rate=row["to_success_rate"],
+        to_retry_rate=row["to_retry_rate"],
+        to_scope_violations=row["to_scope_violations"],
+        sessions_evaluated=row["sessions_evaluated"],
+        team_runs_evaluated=row["team_runs_evaluated"],
+        notes=row["notes"],
+        recorded_at=_parse_dt(row["recorded_at"]) or datetime.now(UTC),
+    )
+
+
+def insert_experiment(db: sqlite3.Connection, experiment: Experiment) -> int:
+    cur = db.execute(
+        """
+        INSERT INTO experiments
+            (workspace_id, experiment_type, config_snapshot, config_hash,
+             document_hashes, document_hash, unified_fitness,
+             qwhr, token_efficiency, promotion_precision,
+             to_success_rate, to_retry_rate, to_scope_violations,
+             sessions_evaluated, team_runs_evaluated, notes, recorded_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """,
+        (
+            experiment.workspace_id,
+            experiment.experiment_type,
+            experiment.config_snapshot,
+            experiment.config_hash,
+            json.dumps(experiment.document_hashes),
+            experiment.document_hash,
+            experiment.unified_fitness,
+            experiment.qwhr,
+            experiment.token_efficiency,
+            experiment.promotion_precision,
+            experiment.to_success_rate,
+            experiment.to_retry_rate,
+            experiment.to_scope_violations,
+            experiment.sessions_evaluated,
+            experiment.team_runs_evaluated,
+            experiment.notes,
+            _dt_str(experiment.recorded_at),
+        ),
+    )
+    db.commit()
+    return cur.lastrowid
+
+
+def list_experiments(
+    db: sqlite3.Connection,
+    workspace_id: str,
+    limit: int = 20,
+    order_by: str = "recorded_at",
+) -> list[Experiment]:
+    allowed_order = {"recorded_at", "unified_fitness"}
+    col = order_by if order_by in allowed_order else "recorded_at"
+    rows = db.execute(
+        f"SELECT * FROM experiments WHERE workspace_id = ? ORDER BY {col} DESC LIMIT ?",
+        (workspace_id, limit),
+    ).fetchall()
+    return [_row_to_experiment(r) for r in rows]
+
+
+def get_best_experiment(
+    db: sqlite3.Connection, workspace_id: str
+) -> Experiment | None:
+    row = db.execute(
+        "SELECT * FROM experiments WHERE workspace_id = ? ORDER BY unified_fitness DESC LIMIT 1",
+        (workspace_id,),
+    ).fetchone()
+    return _row_to_experiment(row) if row else None

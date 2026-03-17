@@ -6,8 +6,8 @@ import pytest
 
 from forge.config import ForgeConfig
 from forge.engines.measure import MeasureResult, run_measure
-from forge.storage.queries import insert_failure, insert_session
-from forge.storage.models import Failure, Session
+from forge.storage.queries import insert_failure, insert_session, insert_team_run
+from forge.storage.models import Failure, Session, TeamRun
 
 
 # ---------------------------------------------------------------------------
@@ -164,3 +164,121 @@ def test_measure_section_effectiveness(db):
     assert result.section_effectiveness["decisions"] is None
     assert result.section_effectiveness["rules"] is None
     assert result.section_effectiveness["knowledge"] is None
+
+
+# ---------------------------------------------------------------------------
+# TO Metrics Tests
+# ---------------------------------------------------------------------------
+
+def _make_team_run(
+    workspace_id: str,
+    run_id: str,
+    complexity: str = "MEDIUM",
+    team_config: str = "sonnet:2+haiku:1",
+    success_rate: float | None = 0.8,
+    retry_rate: float | None = 0.1,
+    scope_violations: int = 0,
+) -> TeamRun:
+    return TeamRun(
+        workspace_id=workspace_id,
+        run_id=run_id,
+        complexity=complexity,
+        team_config=team_config,
+        success_rate=success_rate,
+        retry_rate=retry_rate,
+        scope_violations=scope_violations,
+    )
+
+
+def test_measure_to_no_runs(db):
+    """TO 런 없으면 기본값."""
+    config = ForgeConfig()
+    result = run_measure("no_to_ws", db, config)
+
+    assert result.to_total_runs == 0
+    assert result.to_avg_success_rate is None
+    assert result.to_avg_retry_rate is None
+    assert result.to_avg_scope_violations is None
+    assert result.to_best_configs == {}
+
+
+def test_measure_to_avg_metrics(db):
+    """TO 평균 메트릭 계산."""
+    ws = "to_avg_ws"
+    insert_team_run(db, _make_team_run(ws, "run-1", success_rate=0.8, retry_rate=0.2, scope_violations=1))
+    insert_team_run(db, _make_team_run(ws, "run-2", success_rate=0.6, retry_rate=0.4, scope_violations=3))
+
+    config = ForgeConfig()
+    result = run_measure(ws, db, config)
+
+    assert result.to_total_runs == 2
+    assert result.to_avg_success_rate == pytest.approx(0.7)
+    assert result.to_avg_retry_rate == pytest.approx(0.3)
+    assert result.to_avg_scope_violations == pytest.approx(2.0)
+
+
+def test_measure_to_best_configs(db):
+    """complexity별 best config 선택."""
+    ws = "to_best_ws"
+    insert_team_run(db, _make_team_run(ws, "run-1", complexity="SIMPLE", team_config="haiku:2", success_rate=0.9))
+    insert_team_run(db, _make_team_run(ws, "run-2", complexity="SIMPLE", team_config="sonnet:1", success_rate=0.7))
+    insert_team_run(db, _make_team_run(ws, "run-3", complexity="MEDIUM", team_config="sonnet:2+haiku:1", success_rate=0.85))
+
+    config = ForgeConfig()
+    result = run_measure(ws, db, config)
+
+    assert "SIMPLE" in result.to_best_configs
+    assert result.to_best_configs["SIMPLE"]["config"] == "haiku:2"
+    assert result.to_best_configs["SIMPLE"]["success_rate"] == pytest.approx(0.9)
+    assert "MEDIUM" in result.to_best_configs
+
+
+def test_measure_to_null_rates_skipped(db):
+    """success_rate/retry_rate가 None인 런은 평균 계산에서 제외."""
+    ws = "to_null_ws"
+    insert_team_run(db, _make_team_run(ws, "run-1", success_rate=0.8, retry_rate=None))
+    insert_team_run(db, _make_team_run(ws, "run-2", success_rate=None, retry_rate=0.2))
+
+    config = ForgeConfig()
+    result = run_measure(ws, db, config)
+
+    assert result.to_total_runs == 2
+    assert result.to_avg_success_rate == pytest.approx(0.8)  # only run-1
+    assert result.to_avg_retry_rate == pytest.approx(0.2)    # only run-2
+
+
+def test_measure_to_complexity_none(db):
+    """complexity=None인 런은 UNKNOWN으로 그룹핑."""
+    ws = "to_unknown_ws"
+    insert_team_run(db, _make_team_run(ws, "run-1", complexity=None, success_rate=0.7))
+
+    config = ForgeConfig()
+    result = run_measure(ws, db, config)
+
+    assert "UNKNOWN" in result.to_best_configs
+    assert result.to_best_configs["UNKNOWN"]["success_rate"] == pytest.approx(0.7)
+
+
+def test_measure_to_group_all_null_sr(db):
+    """complexity 그룹 내 모든 success_rate=None → best_configs에 미포함."""
+    ws = "to_allnull_ws"
+    insert_team_run(db, _make_team_run(ws, "run-1", complexity="COMPLEX", success_rate=None))
+    insert_team_run(db, _make_team_run(ws, "run-2", complexity="COMPLEX", success_rate=None))
+
+    config = ForgeConfig()
+    result = run_measure(ws, db, config)
+
+    assert result.to_total_runs == 2
+    assert "COMPLEX" not in result.to_best_configs
+
+
+def test_measure_to_zero_scope_violations(db):
+    """모든 scope_violations=0 → avg_scope_violations=0.0."""
+    ws = "to_zero_sv_ws"
+    insert_team_run(db, _make_team_run(ws, "run-1", scope_violations=0))
+    insert_team_run(db, _make_team_run(ws, "run-2", scope_violations=0))
+
+    config = ForgeConfig()
+    result = run_measure(ws, db, config)
+
+    assert result.to_avg_scope_violations == pytest.approx(0.0)

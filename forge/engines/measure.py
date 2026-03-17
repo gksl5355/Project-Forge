@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from forge.config import ForgeConfig
 from forge.core.context import build_context, estimate_tokens
+from forge.engines.fitness import compute_unified_fitness
 from forge.engines.optimizer import compute_qwhr
-from forge.storage.queries import list_failures, list_rules, list_sessions
+from forge.storage.queries import list_failures, list_rules, list_sessions, list_team_runs
 
 
 @dataclass
@@ -21,6 +22,13 @@ class MeasureResult:
     q_convergence_speed: float              # 도움된 패턴의 평균 times_seen (적을수록 빠른 수렴)
     total_failures: int
     total_sessions: int
+    # TO (Team Orchestrator) metrics
+    to_total_runs: int = 0
+    to_avg_success_rate: float | None = None
+    to_avg_retry_rate: float | None = None
+    to_avg_scope_violations: float | None = None
+    to_best_configs: dict[str, dict] = field(default_factory=dict)  # complexity → {config, success_rate, runs}
+    unified_fitness: float = 0.0
 
 
 def run_measure(
@@ -97,6 +105,55 @@ def run_measure(
     else:
         q_convergence_speed = 0.0
 
+    # --- TO metrics ---
+    team_runs = list_team_runs(db, workspace_id, limit=100)
+    to_total_runs = len(team_runs)
+    to_avg_success_rate: float | None = None
+    to_avg_retry_rate: float | None = None
+    to_avg_scope_violations: float | None = None
+    to_best_configs: dict[str, dict] = {}
+
+    if team_runs:
+        sr_vals = [tr.success_rate for tr in team_runs if tr.success_rate is not None]
+        rr_vals = [tr.retry_rate for tr in team_runs if tr.retry_rate is not None]
+        sv_vals = [tr.scope_violations for tr in team_runs]
+
+        if sr_vals:
+            to_avg_success_rate = sum(sr_vals) / len(sr_vals)
+        if rr_vals:
+            to_avg_retry_rate = sum(rr_vals) / len(rr_vals)
+        if sv_vals:
+            to_avg_scope_violations = sum(sv_vals) / len(sv_vals)
+
+        # Best configs per complexity
+        by_complexity: dict[str, list] = {}
+        for tr in team_runs:
+            c = tr.complexity or "UNKNOWN"
+            by_complexity.setdefault(c, []).append(tr)
+
+        for complexity, runs in by_complexity.items():
+            with_sr = [r for r in runs if r.success_rate is not None]
+            if with_sr:
+                best = max(with_sr, key=lambda r: r.success_rate)  # type: ignore[arg-type]
+                to_best_configs[complexity] = {
+                    "config": best.team_config or "N/A",
+                    "success_rate": best.success_rate,
+                    "runs": len(runs),
+                }
+
+    # Compute unified fitness
+    # token_efficiency: helped_per_1k_tokens normalized (per 1000 tokens → per token)
+    token_eff = helped_per_1k_tokens / 1000.0 if helped_per_1k_tokens > 0 else 0.0
+    unified = compute_unified_fitness(
+        qwhr=qwhr,
+        token_efficiency=token_eff,
+        promotion_precision=promotion_precision,
+        to_success_rate=to_avg_success_rate,
+        to_retry_rate=to_avg_retry_rate,
+        to_scope_violations=to_avg_scope_violations,
+        to_run_count=to_total_runs,
+    )
+
     return MeasureResult(
         qwhr=qwhr,
         promotion_precision=promotion_precision,
@@ -106,4 +163,10 @@ def run_measure(
         q_convergence_speed=q_convergence_speed,
         total_failures=total_failures,
         total_sessions=total_sessions,
+        to_total_runs=to_total_runs,
+        to_avg_success_rate=to_avg_success_rate,
+        to_avg_retry_rate=to_avg_retry_rate,
+        to_avg_scope_violations=to_avg_scope_violations,
+        to_best_configs=to_best_configs,
+        unified_fitness=unified,
     )

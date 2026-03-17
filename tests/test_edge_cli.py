@@ -3,6 +3,8 @@
 Coverage:
   forge init (double init)
   forge record failure/decision/rule/knowledge (missing fields, duplicates, enums)
+  forge measure (standard + TO metrics output)
+  forge recommend (standard + edge cases)
   forge list (empty DB, type/sort variations)
   forge search (tags)
   forge detail (existing/non-existent)
@@ -23,13 +25,14 @@ from typer.testing import CliRunner
 
 from forge.cli import app
 from forge.config import ForgeConfig
-from forge.storage.models import Decision, Failure, Knowledge, Rule, Session
+from forge.storage.models import Decision, Failure, Knowledge, Rule, Session, TeamRun
 from forge.storage.queries import (
     insert_decision,
     insert_failure,
     insert_knowledge,
     insert_rule,
     insert_session,
+    insert_team_run,
 )
 
 
@@ -890,3 +893,92 @@ class TestInstallHooks:
             runner.invoke(app, ["install-hooks"])
             runner.invoke(app, ["install-hooks"])
         assert mock_install.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# forge measure (TO metrics)
+# ---------------------------------------------------------------------------
+
+class TestMeasure:
+    def test_measure_empty_workspace(self, runner: CliRunner, db):
+        """빈 workspace → 기본 메트릭 출력, TO 섹션 없음."""
+        result = _invoke(runner, db, ["measure", "--workspace", "empty_ws"])
+        assert result.exit_code == 0
+        assert "QWHR" in result.output
+        assert "TO Metrics" not in result.output  # no team runs
+
+    def test_measure_with_to_runs(self, runner: CliRunner, db):
+        """team_runs 있으면 TO Metrics 섹션 출력."""
+        insert_team_run(db, TeamRun(
+            workspace_id="default", run_id="run-1", complexity="MEDIUM",
+            team_config="sonnet:2+haiku:1", success_rate=0.85, retry_rate=0.1,
+            scope_violations=1,
+        ))
+        insert_team_run(db, TeamRun(
+            workspace_id="default", run_id="run-2", complexity="MEDIUM",
+            team_config="sonnet:2+haiku:1", success_rate=0.75, retry_rate=0.2,
+            scope_violations=2,
+        ))
+        result = _invoke(runner, db, ["measure", "--workspace", "default"])
+        assert result.exit_code == 0
+        assert "TO Metrics" in result.output
+        assert "Team Runs: 2" in result.output
+        assert "Avg success rate" in result.output
+        assert "Best configs" in result.output
+
+    def test_measure_to_best_configs_output(self, runner: CliRunner, db):
+        """best configs 출력에 complexity, config, success 포함."""
+        insert_team_run(db, TeamRun(
+            workspace_id="default", run_id="run-1", complexity="SIMPLE",
+            team_config="haiku:2", success_rate=0.9,
+        ))
+        result = _invoke(runner, db, ["measure", "--workspace", "default"])
+        assert result.exit_code == 0
+        assert "SIMPLE" in result.output
+        assert "haiku:2" in result.output
+
+
+# ---------------------------------------------------------------------------
+# forge recommend
+# ---------------------------------------------------------------------------
+
+class TestRecommend:
+    def test_recommend_no_runs(self, runner: CliRunner, db):
+        """런 없으면 안내 메시지."""
+        result = _invoke(runner, db, ["recommend", "--workspace", "empty_ws", "--complexity", "MEDIUM"])
+        assert result.exit_code == 0
+        assert "No team runs found" in result.output
+
+    def test_recommend_with_data(self, runner: CliRunner, db):
+        """데이터 있으면 추천 출력."""
+        for i in range(3):
+            insert_team_run(db, TeamRun(
+                workspace_id="default", run_id=f"run-{i}",
+                complexity="MEDIUM", team_config="sonnet:2+haiku:1",
+                success_rate=0.8, retry_rate=0.15,
+            ))
+        result = _invoke(runner, db, ["recommend", "--workspace", "default", "--complexity", "MEDIUM"])
+        assert result.exit_code == 0
+        assert "sonnet:2+haiku:1" in result.output
+        assert "80%" in result.output
+        assert "confidence" in result.output
+
+    def test_recommend_wrong_complexity(self, runner: CliRunner, db):
+        """매칭 안 되는 complexity → No team runs."""
+        insert_team_run(db, TeamRun(
+            workspace_id="default", run_id="run-1", complexity="SIMPLE",
+            team_config="haiku:2", success_rate=0.9,
+        ))
+        result = _invoke(runner, db, ["recommend", "--workspace", "default", "--complexity", "COMPLEX"])
+        assert result.exit_code == 0
+        assert "No team runs found" in result.output
+
+    def test_recommend_default_args(self, runner: CliRunner, db):
+        """기본 인자: workspace=default, complexity=MEDIUM."""
+        insert_team_run(db, TeamRun(
+            workspace_id="default", run_id="run-1", complexity="MEDIUM",
+            team_config="sonnet:1", success_rate=0.7,
+        ))
+        result = _invoke(runner, db, ["recommend"])
+        assert result.exit_code == 0
+        assert "sonnet:1" in result.output

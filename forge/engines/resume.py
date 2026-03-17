@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+from pathlib import Path
 
 from forge.config import ForgeConfig
 
@@ -133,10 +134,18 @@ def run_resume(
     # 주입한 경고 패턴 목록 기록
     warnings_injected = [f.pattern for f in failures]
 
+    # Compute config & document hashes for experiment tracking
+    from forge.core.hashing import compute_config_hash, compute_combined_doc_hash, compute_doc_hashes
+    config_hash = compute_config_hash(config)
+    doc_hashes = compute_doc_hashes(Path(workspace_id) if Path(workspace_id).is_dir() else None)
+    doc_hash = compute_combined_doc_hash(doc_hashes)
+
     session = Session(
         session_id=session_id,
         workspace_id=workspace_id,
         warnings_injected=warnings_injected,
+        config_hash=config_hash,
+        document_hash=doc_hash,
     )
     insert_session(db, session)
 

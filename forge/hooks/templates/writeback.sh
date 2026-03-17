@@ -23,3 +23,6 @@ forge writeback --workspace "$WORKSPACE" --session-id "$SESSION_ID" --transcript
     echo "Warning: forge writeback failed." >&2
     exit 0
 }
+
+# Auto-ingest TO run data (background, non-blocking)
+forge ingest --workspace "$WORKSPACE" --auto 2>/dev/null &

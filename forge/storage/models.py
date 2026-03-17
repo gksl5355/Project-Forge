@@ -80,6 +80,9 @@ class Session:
     failures_encountered: int = 0
     q_updates_count: int = 0
     promotions_count: int = 0
+    config_hash: str | None = None
+    document_hash: str | None = None
+    unified_fitness: float | None = None
     id: int | None = None
 
 
@@ -96,4 +99,26 @@ class TeamRun:
     verdict: str | None = None
     agents: list[dict] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    id: int | None = None
+
+
+@dataclass
+class Experiment:
+    workspace_id: str
+    experiment_type: str = "auto"      # auto | manual | ablation
+    config_snapshot: str = ""          # JSON
+    config_hash: str = ""
+    document_hashes: dict[str, str] = field(default_factory=dict)
+    document_hash: str = ""
+    unified_fitness: float = 0.0
+    qwhr: float | None = None
+    token_efficiency: float | None = None
+    promotion_precision: float | None = None
+    to_success_rate: float | None = None
+    to_retry_rate: float | None = None
+    to_scope_violations: float | None = None
+    sessions_evaluated: int = 0
+    team_runs_evaluated: int = 0
+    notes: str | None = None
+    recorded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     id: int | None = None

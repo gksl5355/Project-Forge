@@ -551,6 +551,37 @@ def cmd_install_hooks():
 
 
 # ---------------------------------------------------------------------------
+# forge setup (one-stop setup)
+# ---------------------------------------------------------------------------
+
+@app.command("setup")
+def cmd_setup():
+    """Forge 전체 설정 (DB 초기화 + hooks 설치 + 팀 환경 구성)."""
+    from forge.hooks.install import install_hooks
+
+    # 1. Init DB
+    init_db()
+    typer.echo("[1/3] DB initialized.")
+
+    # 2. Install hooks + teammate + env
+    install_hooks()
+    typer.echo("[2/3] Hooks + teammate.sh installed.")
+
+    # 3. Summary
+    typer.echo("[3/3] Setup complete.")
+    typer.echo("")
+    typer.echo("Installed:")
+    typer.echo("  ~/.forge/forge.db          (experience database)")
+    typer.echo("  ~/.forge/hooks/resume.sh   (SessionStart hook)")
+    typer.echo("  ~/.forge/hooks/writeback.sh (SessionEnd hook)")
+    typer.echo("  ~/.forge/hooks/detect.sh   (PostToolUse hook)")
+    typer.echo("  ~/.forge/hooks/teammate.sh (team model selector)")
+    typer.echo("  ~/.claude/settings.json    (hooks + env patched)")
+    typer.echo("")
+    typer.echo("Next: Start a Claude Code session. Forge will auto-learn.")
+
+
+# ---------------------------------------------------------------------------
 # forge ingest (v1: TO 런 데이터 수집)
 # ---------------------------------------------------------------------------
 
@@ -730,6 +761,240 @@ def cmd_measure(
             typer.echo(f"    {section}:   N/A")
         else:
             typer.echo(f"    {section}:   {value:.2f}")
+
+    # TO metrics
+    if result.to_total_runs > 0:
+        typer.echo("")
+        typer.echo(f"=== TO Metrics (Team Runs: {result.to_total_runs}) ===")
+        sr = f"{result.to_avg_success_rate:.0%}" if result.to_avg_success_rate is not None else "N/A"
+        rr = f"{result.to_avg_retry_rate:.0%}" if result.to_avg_retry_rate is not None else "N/A"
+        sv = f"{result.to_avg_scope_violations:.1f}" if result.to_avg_scope_violations is not None else "N/A"
+        typer.echo(f"  Avg success rate:      {sr}")
+        typer.echo(f"  Avg retry rate:        {rr}")
+        typer.echo(f"  Avg scope violations:  {sv}")
+        if result.to_best_configs:
+            typer.echo("  Best configs:")
+            for complexity, info in result.to_best_configs.items():
+                typer.echo(
+                    f"    {complexity}: {info['config']} "
+                    f"(success: {info['success_rate']:.0%}, runs: {info['runs']})"
+                )
+    typer.echo(f"  Unified fitness:       {result.unified_fitness:.4f}")
+
+
+# ---------------------------------------------------------------------------
+# forge recommend
+# ---------------------------------------------------------------------------
+
+@app.command("recommend")
+def cmd_recommend(
+    workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
+    complexity: str = typer.Option("MEDIUM", "--complexity", "-c",
+                                    help="SIMPLE | MEDIUM | COMPLEX"),
+) -> None:
+    """팀 구성 추천 (과거 TO 런 기반)."""
+    from forge.engines.recommend import run_recommend
+
+    db = get_connection()
+
+    result = run_recommend(workspace, complexity, db)
+
+    if result is None:
+        typer.echo(f"No team runs found for complexity={complexity} in workspace '{workspace}'.")
+        return
+
+    typer.echo(
+        f"{result.config} "
+        f"({result.runs} runs, success: {result.avg_success_rate:.0%}, "
+        f"confidence: {result.confidence})"
+    )
+
+
+# ---------------------------------------------------------------------------
+# forge trend
+# ---------------------------------------------------------------------------
+
+@app.command("trend")
+def cmd_trend(
+    workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
+    n: int = typer.Option(20, "-n", help="표시할 실험 수"),
+) -> None:
+    """실험 fitness 추이 조회."""
+    from forge.storage.queries import get_best_experiment, list_experiments
+
+    db = get_connection()
+    experiments = list_experiments(db, workspace, limit=n, order_by="recorded_at")
+
+    if not experiments:
+        typer.echo(f"No experiments found for workspace '{workspace}'.")
+        return
+
+    # Reverse to show oldest first (list_experiments returns newest first)
+    experiments = list(reversed(experiments))
+
+    typer.echo(f"=== Fitness Trend (last {len(experiments)}) ===")
+    typer.echo(f"{'Time':<18} | {'Fitness':>7} | {'Δ':>7} | {'Config':>8} | {'Doc':>8} | {'Type':<8}")
+    typer.echo("-" * 75)
+
+    prev_fitness = None
+    worst = min(e.unified_fitness for e in experiments)
+    for exp in experiments:
+        delta = ""
+        if prev_fitness is not None:
+            d = exp.unified_fitness - prev_fitness
+            delta = f"{d:+.3f}"
+        time_str = exp.recorded_at.strftime("%Y-%m-%d %H:%M") if exp.recorded_at else "N/A"
+        typer.echo(
+            f"{time_str:<18} | {exp.unified_fitness:>7.4f} | {delta:>7} | "
+            f"{exp.config_hash[:8]:>8} | {exp.document_hash[:8]:>8} | {exp.experiment_type:<8}"
+        )
+        prev_fitness = exp.unified_fitness
+
+    best_exp = get_best_experiment(db, workspace)
+    best_fitness = best_exp.unified_fitness if best_exp else 0.0
+    current = experiments[-1].unified_fitness if experiments else 0.0
+    typer.echo("-" * 75)
+    typer.echo(
+        f"Best: {best_fitness:.4f} | Worst: {worst:.4f} | Current: {current:.4f}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# forge research
+# ---------------------------------------------------------------------------
+
+@app.command("research")
+def cmd_research(
+    workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
+    max_rounds: int = typer.Option(50, "--max-rounds", help="최대 반복 횟수"),
+    strategy: str = typer.Option("greedy", "--strategy", help="greedy | ablation"),
+    include_docs: bool = typer.Option(False, "--include-docs", help="문서 directive도 탐색 대상에 포함"),
+    target_fitness: float = typer.Option(0.85, "--target-fitness", help="목표 fitness"),
+    save_best: bool = typer.Option(False, "--save-best", help="최적 config 저장"),
+) -> None:
+    """AutoResearch 확장 — 문서 포함 최적화 루프."""
+    import json as json_mod
+    from forge.core.hashing import compute_config_hash, compute_combined_doc_hash, compute_doc_hashes
+    from forge.engines.fitness import compute_unified_fitness
+    from forge.engines.measure import run_measure
+    from forge.engines.optimizer import run_autoresearch, PARAM_GRID
+    from forge.storage.models import Experiment
+    from forge.storage.queries import insert_experiment
+
+    db = get_connection()
+    config = load_config()
+
+    # 1. Baseline measurement
+    measure_result = run_measure(workspace, db, config)
+    typer.echo(f"Baseline fitness: {measure_result.unified_fitness:.4f}")
+
+    if measure_result.total_sessions == 0 and measure_result.total_failures == 0:
+        typer.echo("No data to optimize. Record some sessions first.")
+        return
+
+    # 2. Config hash + doc hashes
+    config_hash = compute_config_hash(config)
+    doc_hashes = compute_doc_hashes(Path.cwd())
+    doc_hash = compute_combined_doc_hash(doc_hashes)
+
+    # 3. Record baseline experiment
+    baseline_exp = Experiment(
+        workspace_id=workspace,
+        experiment_type="manual",
+        config_snapshot=json_mod.dumps({
+            k: getattr(config, k) for k in PARAM_GRID
+        }),
+        config_hash=config_hash,
+        document_hashes=doc_hashes,
+        document_hash=doc_hash,
+        unified_fitness=measure_result.unified_fitness,
+        qwhr=measure_result.qwhr,
+        token_efficiency=measure_result.helped_per_1k_tokens / 1000.0,
+        promotion_precision=measure_result.promotion_precision,
+        to_success_rate=measure_result.to_avg_success_rate,
+        to_retry_rate=measure_result.to_avg_retry_rate,
+        to_scope_violations=measure_result.to_avg_scope_violations,
+        sessions_evaluated=measure_result.total_sessions,
+        team_runs_evaluated=measure_result.to_total_runs,
+        notes="baseline",
+    )
+    insert_experiment(db, baseline_exp)
+
+    # 4. Run config optimization
+    def on_progress(step, total, desc, result, improved):
+        marker = " IMPROVED" if improved else ""
+        typer.echo(f"  [{step}/{total}] {desc} -> fitness: {result.composite_fitness:.4f}{marker}")
+
+    typer.echo(f"\nOptimizing config (max {max_rounds} rounds, strategy: {strategy})...")
+    opt_result = run_autoresearch(
+        workspace, db, config, max_experiments=max_rounds, strategy=strategy,
+        on_progress=on_progress,
+    )
+
+    if opt_result.improved:
+        best = opt_result.best
+        new_config_hash = compute_config_hash(best.config)
+
+        best_exp = Experiment(
+            workspace_id=workspace,
+            experiment_type="auto",
+            config_snapshot=json_mod.dumps({
+                k: getattr(best.config, k) for k in PARAM_GRID
+            }),
+            config_hash=new_config_hash,
+            document_hashes=doc_hashes,
+            document_hash=doc_hash,
+            unified_fitness=best.composite_fitness,
+            qwhr=best.qwhr,
+            token_efficiency=best.token_efficiency,
+            promotion_precision=best.promotion_precision,
+            sessions_evaluated=best.sessions_evaluated,
+            notes="auto-research best",
+        )
+        insert_experiment(db, best_exp)
+
+        typer.echo(f"\nBest fitness: {best.composite_fitness:.4f} (was {opt_result.baseline.composite_fitness:.4f})")
+
+        if best.composite_fitness >= target_fitness:
+            typer.echo(f"Target fitness {target_fitness:.2f} reached!")
+
+        if save_best:
+            from forge.config import save_config_yaml
+            save_config_yaml(best.config)
+            typer.echo("Best config saved to ~/.forge/config.yml")
+
+        typer.echo(f"\n=== Recommended Config Changes ===")
+        for param in PARAM_GRID:
+            baseline_val = getattr(opt_result.baseline.config, param)
+            best_val = getattr(opt_result.best.config, param)
+            if baseline_val != best_val:
+                typer.echo(f"  {param}: {baseline_val} -> {best_val}")
+    else:
+        typer.echo("\nCurrent config is already optimal.")
+
+    # 5. Document ablation (if --include-docs)
+    if include_docs:
+        typer.echo(f"\n=== Document Directive Analysis ===")
+        try:
+            from forge.engines.directive_extractor import extract_directives
+            # Find CLAUDE.md in cwd
+            claude_md = Path.cwd() / "CLAUDE.md"
+            if claude_md.exists():
+                directives = extract_directives(claude_md)
+                typer.echo(f"Extracted {len(directives)} directives from CLAUDE.md")
+                by_type: dict[str, int] = {}
+                for d in directives:
+                    by_type[d.directive_type] = by_type.get(d.directive_type, 0) + 1
+                for dt, count in sorted(by_type.items()):
+                    typer.echo(f"  {dt}: {count}")
+                total_tokens = sum(d.tokens for d in directives)
+                typer.echo(f"  Total tokens: ~{total_tokens}")
+            else:
+                typer.echo("No CLAUDE.md found in current directory.")
+        except ImportError:
+            typer.echo("Directive extractor not available.")
+
+    typer.echo(f"\nExperiments: {opt_result.total_experiments}")
 
 
 if __name__ == "__main__":

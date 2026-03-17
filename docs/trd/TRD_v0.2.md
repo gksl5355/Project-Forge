@@ -4,7 +4,7 @@
 
 | 항목 | 선택 | 이유 |
 |------|------|------|
-| 언어 | Python 3.11+ | 타입 힌트, sqlite3 내장 |
+| 언어 | Python 3.12+ | 타입 힌트, sqlite3 내장 |
 | CLI | Typer | 타입 기반 CLI, Click 상위 호환 |
 | DB | sqlite3 (내장) | 외부 의존성 없음 |
 | Config | PyYAML | config.yml 파싱 |
@@ -176,6 +176,9 @@ class Session:
     warnings_injected: list[str]  # failure pattern 목록
     started_at: datetime
     ended_at: datetime | None
+    failures_encountered: int  # v2: session 중 마주친 실패 개수
+    q_updates_count: int       # v2: Q값 갱신 횟수
+    promotions_count: int      # v2: 전역 승격 횟수
 ```
 
 ### 3.3 storage/queries.py
