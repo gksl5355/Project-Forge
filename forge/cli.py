@@ -31,6 +31,7 @@ from forge.storage.queries import (
     list_flagged_failures,
     list_knowledge,
     list_rules,
+    list_team_runs,
     search_by_tags,
     update_decision,
     update_failure,
@@ -69,6 +70,12 @@ def cmd_record_failure(
     cause: Optional[str] = typer.Option(None, "--cause", help="예상 원인"),
 ):
     """실패 패턴 기록."""
+    if len(pattern) > 200:
+        typer.echo("Error: pattern must be 200 chars or less", err=True)
+        raise typer.Exit(1)
+    if len(hint) > 2000:
+        typer.echo("Error: hint must be 2000 chars or less", err=True)
+        raise typer.Exit(1)
     valid_qualities = {"near_miss", "preventable", "environmental"}
     if quality not in valid_qualities:
         typer.echo(f"Error: quality must be one of {valid_qualities}", err=True)
@@ -185,7 +192,7 @@ def cmd_record_knowledge(
 def cmd_list(
     workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
     type_: str = typer.Option("failure", "--type", "-t",
-                               help="failure | decision | rule | knowledge"),
+                               help="failure | decision | rule | knowledge | team_run"),
     sort: str = typer.Option("q", "--sort", "-s", help="정렬 기준 (q, times_seen, created_at)"),
     flagged: bool = typer.Option(False, "--flagged", help="review_flag가 True인 실패만 표시"),
 ):
@@ -211,6 +218,11 @@ def cmd_list(
         items = list_knowledge(db, workspace)
         for k in items:
             typer.echo(f"[{k.id}] {k.title} | Q:{k.q:.2f}")
+    elif type_ == "team_run":
+        items = list_team_runs(db, workspace)
+        for tr in items:
+            sr = f"{tr.success_rate:.0%}" if tr.success_rate is not None else "N/A"
+            typer.echo(f"[{tr.id}] {tr.run_id} | {tr.complexity or 'N/A'} | success:{sr} | {tr.verdict or ''}")
     else:
         typer.echo(f"Error: unknown type '{type_}'", err=True)
         raise typer.Exit(1)
@@ -466,11 +478,12 @@ def cmd_decay(
 def cmd_resume(
     workspace: str = typer.Option(..., "--workspace", "-w", help="워크스페이스 ID (cwd)"),
     session_id: str = typer.Option(..., "--session-id", help="세션 ID"),
+    team_brief: bool = typer.Option(False, "--team-brief", help="팀 경험 요약만 출력 (TO 연동용)"),
 ):
     """세션 시작 시 context 주입 (SessionStart hook용)."""
     db = get_connection()
     config = load_config()
-    context = run_resume(workspace, session_id, db, config)
+    context = run_resume(workspace, session_id, db, config, team_brief=team_brief)
     if context:
         typer.echo(context)
 
@@ -484,11 +497,12 @@ def cmd_writeback(
     workspace: str = typer.Option(..., "--workspace", "-w", help="워크스페이스 ID"),
     session_id: str = typer.Option(..., "--session-id", help="세션 ID"),
     transcript: str = typer.Option(..., "--transcript", help="transcript.jsonl 경로"),
+    llm_extract: bool = typer.Option(False, "--llm-extract", help="LLM 기반 자동 추출 활성화"),
 ):
     """세션 종료 시 학습 (SessionEnd hook용)."""
     db = get_connection()
     config = load_config()
-    run_writeback(workspace, session_id, Path(transcript), db, config)
+    run_writeback(workspace, session_id, Path(transcript), db, config, llm_extract=llm_extract)
     typer.echo("Writeback complete.")
 
 
@@ -527,6 +541,85 @@ def cmd_install_hooks():
     from forge.hooks.install import install_hooks  # lazy import to avoid startup cost
     install_hooks()
     typer.echo("Hooks installed successfully.")
+
+
+# ---------------------------------------------------------------------------
+# forge ingest (v1: TO 런 데이터 수집)
+# ---------------------------------------------------------------------------
+
+@app.command("ingest")
+def cmd_ingest(
+    workspace: str = typer.Option(..., "--workspace", "-w", help="워크스페이스 ID"),
+    run_dir: Optional[str] = typer.Option(None, "--run-dir", help=".claude/runs/<RUN_ID>/ 경로"),
+    auto: bool = typer.Option(False, "--auto", help=".claude/runs/ 아래 자동 감지"),
+):
+    """TO 런 데이터를 forge.db로 수집."""
+    from forge.engines.ingest import run_ingest, run_ingest_auto
+
+    db = init_db()
+    config = load_config()
+
+    if auto:
+        runs_base = Path(workspace) / ".claude" / "runs"
+        counts = run_ingest_auto(workspace, runs_base, db, config)
+    elif run_dir:
+        counts = run_ingest(workspace, Path(run_dir), db, config)
+    else:
+        typer.echo("Error: specify --run-dir or --auto", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"Ingested: {counts['team_runs']} runs, {counts['failures']} failures, {counts['knowledge']} knowledge")
+
+
+# ---------------------------------------------------------------------------
+# forge embed (v1: 벡터 임베딩 생성)
+# ---------------------------------------------------------------------------
+
+@app.command("embed")
+def cmd_embed(
+    workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
+):
+    """실패 패턴에 대한 벡터 임베딩 생성."""
+    from forge.core.embedding import embed_failures, get_embedder
+
+    if get_embedder() is None:
+        typer.echo("Error: sentence-transformers not installed. Run: pip install sentence-transformers", err=True)
+        raise typer.Exit(1)
+
+    db = init_db()
+    count = embed_failures(db, workspace)
+    typer.echo(f"Embedded {count} failure(s).")
+
+
+# ---------------------------------------------------------------------------
+# forge dedup (v1: 중복 병합)
+# ---------------------------------------------------------------------------
+
+@app.command("dedup")
+def cmd_dedup(
+    workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
+    auto: bool = typer.Option(False, "--auto", help="자동 병합 (확인 없이)"),
+):
+    """유사 실패 패턴 중복 탐지 및 병합."""
+    from forge.core.dedup import run_dedup
+
+    db = init_db()
+    config = load_config()
+    results = run_dedup(db, workspace, config, auto=auto)
+
+    if not results:
+        typer.echo("No duplicates found.")
+        return
+
+    for r in results:
+        action = "MERGED" if r.get("merged") else "SUGGEST"
+        typer.echo(
+            f"[{action}] {r['pattern_a']} (Q:{r['q_a']:.2f}) "
+            f"↔ {r['pattern_b']} (Q:{r['q_b']:.2f}) — similarity {r['similarity']:.2f}"
+        )
+
+    if not auto:
+        typer.echo(f"\n{len(results)} duplicate pair(s) found. Use --auto to merge automatically.")
 
 
 if __name__ == "__main__":

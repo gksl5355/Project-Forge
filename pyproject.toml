@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "project-forge"
-version = "0.1.0"
+version = "1.0.0"
 description = "Experience learning CLI for coding agents"
 requires-python = ">=3.12"
 dependencies = [
@@ -16,6 +16,18 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-cov",
+]
+vector = [
+    "sqlite-vec>=0.1.0",
+    "sentence-transformers>=2.0",
+]
+llm = [
+    "anthropic>=0.30",
+]
+all = [
+    "sqlite-vec>=0.1.0",
+    "sentence-transformers>=2.0",
+    "anthropic>=0.30",
 ]
 
 [project.scripts]

@@ -4,16 +4,15 @@ import pytest
 
 @pytest.fixture
 def db():
-    """In-memory SQLite DB with schema initialized."""
+    """In-memory SQLite DB with v3 schema initialized."""
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
 
-    # Schema from ARCHITECTURE_v0.2.md
     conn.executescript("""
         CREATE TABLE schema_version (version INTEGER NOT NULL);
-        INSERT INTO schema_version VALUES (2);
+        INSERT INTO schema_version VALUES (3);
 
         CREATE TABLE failures (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,6 +30,7 @@ def db():
             projects_seen   TEXT DEFAULT '[]',
             source          TEXT DEFAULT 'manual',
             review_flag     INTEGER DEFAULT 0,
+            active          INTEGER DEFAULT 1,
             last_used       DATETIME,
             created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -87,10 +87,26 @@ def db():
             promotions_count INTEGER DEFAULT 0
         );
 
+        CREATE TABLE team_runs (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            workspace_id    TEXT NOT NULL,
+            run_id          TEXT NOT NULL UNIQUE,
+            complexity      TEXT,
+            team_config     TEXT,
+            duration_min    REAL,
+            success_rate    REAL,
+            retry_rate      REAL,
+            scope_violations INTEGER DEFAULT 0,
+            verdict         TEXT,
+            agents          TEXT DEFAULT '[]',
+            created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
         CREATE INDEX idx_failures_ws_q ON failures(workspace_id, q DESC);
         CREATE INDEX idx_decisions_ws_status ON decisions(workspace_id, status);
         CREATE INDEX idx_knowledge_ws_q ON knowledge(workspace_id, q DESC);
         CREATE INDEX idx_rules_ws_active ON rules(workspace_id, active);
+        CREATE INDEX idx_team_runs_ws ON team_runs(workspace_id);
     """)
 
     yield conn

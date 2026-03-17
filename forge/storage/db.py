@@ -5,13 +5,13 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-CURRENT_SCHEMA_VERSION = 2
+CURRENT_SCHEMA_VERSION = 3
 
 _SCHEMA_SQL = """
 CREATE TABLE schema_version (
     version INTEGER NOT NULL
 );
-INSERT INTO schema_version VALUES (2);
+INSERT INTO schema_version VALUES (3);
 
 CREATE TABLE failures (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,6 +29,7 @@ CREATE TABLE failures (
     projects_seen   TEXT DEFAULT '[]',
     source          TEXT DEFAULT 'manual',
     review_flag     INTEGER DEFAULT 0,
+    active          INTEGER DEFAULT 1,
     last_used       DATETIME,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -85,10 +86,26 @@ CREATE TABLE sessions (
     promotions_count INTEGER DEFAULT 0
 );
 
+CREATE TABLE team_runs (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id    TEXT NOT NULL,
+    run_id          TEXT NOT NULL UNIQUE,
+    complexity      TEXT,
+    team_config     TEXT,
+    duration_min    REAL,
+    success_rate    REAL,
+    retry_rate      REAL,
+    scope_violations INTEGER DEFAULT 0,
+    verdict         TEXT,
+    agents          TEXT DEFAULT '[]',
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX idx_failures_ws_q ON failures(workspace_id, q DESC);
 CREATE INDEX idx_decisions_ws_status ON decisions(workspace_id, status);
 CREATE INDEX idx_knowledge_ws_q ON knowledge(workspace_id, q DESC);
 CREATE INDEX idx_rules_ws_active ON rules(workspace_id, active);
+CREATE INDEX idx_team_runs_ws ON team_runs(workspace_id);
 """
 
 _DEFAULT_DB_PATH = Path.home() / ".forge" / "forge.db"
@@ -143,6 +160,43 @@ def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
         conn.execute(
             "ALTER TABLE sessions ADD COLUMN promotions_count INTEGER DEFAULT 0"
         )
+
+    if from_version < 3:
+        # v2 → v3: active column on failures, team_runs table
+        conn.execute(
+            "ALTER TABLE failures ADD COLUMN active INTEGER DEFAULT 1"
+        )
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS team_runs (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                workspace_id    TEXT NOT NULL,
+                run_id          TEXT NOT NULL UNIQUE,
+                complexity      TEXT,
+                team_config     TEXT,
+                duration_min    REAL,
+                success_rate    REAL,
+                retry_rate      REAL,
+                scope_violations INTEGER DEFAULT 0,
+                verdict         TEXT,
+                agents          TEXT DEFAULT '[]',
+                created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_team_runs_ws ON team_runs(workspace_id)"
+        )
+        # sqlite-vec virtual table (conditional: only if extension loaded)
+        try:
+            conn.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS failure_embeddings USING vec0(
+                    failure_id INTEGER PRIMARY KEY,
+                    embedding float[384]
+                )
+            """)
+        except sqlite3.OperationalError:
+            # sqlite-vec extension not available — skip vector table
+            pass
+
     conn.execute(
         "UPDATE schema_version SET version = ?", (CURRENT_SCHEMA_VERSION,)
     )

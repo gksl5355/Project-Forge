@@ -17,10 +17,11 @@ from forge.core.promote import (
 )
 from forge.core.qvalue import ema_update, initial_q, time_decay
 from forge.engines.transcript import parse_transcript
-from forge.storage.models import Failure
+from forge.storage.models import Decision, Failure
 from forge.storage.queries import (
     get_failure_by_pattern,
     get_session,
+    insert_decision,
     insert_failure,
     insert_knowledge,
     list_failures,
@@ -65,12 +66,13 @@ def run_writeback(
     transcript_path: Path,
     db: sqlite3.Connection,
     config: ForgeConfig,
+    llm_extract: bool = False,
 ) -> None:
     """transcript 파싱 → Q 갱신 → 감쇠 → 승격 (단일 SQLite 트랜잭션)."""
     proxy = _NoCommitProxy(db)
 
     try:
-        _do_writeback(workspace_id, session_id, transcript_path, proxy, config)
+        _do_writeback(workspace_id, session_id, transcript_path, proxy, config, llm_extract)
         db.commit()
     except Exception:
         db.rollback()
@@ -83,6 +85,7 @@ def _do_writeback(
     transcript_path: Path,
     db: Any,
     config: ForgeConfig,
+    llm_extract: bool = False,
 ) -> None:
     """실제 writeback 로직 (proxy db 사용, commit 없음)."""
     bash_failures = parse_transcript(transcript_path)
@@ -179,7 +182,57 @@ def _do_writeback(
             print(f"[forge] Knowledge candidate: '{failure.pattern}' → '{knowledge.title}' (Q: {failure.q:.2f})")
             p_promotions += 1
 
+    # 4.5 LLM extraction (optional)
+    if llm_extract and config.llm_extract_enabled:
+        _llm_extract_step(workspace_id, transcript_path, db, config)
+
     # 5. 세션 종료 기록 (impact metrics 포함)
     update_session_metrics(db, session_id, n_failures, m_q_updates, p_promotions)
 
     print(f"[forge] Writeback: {n_failures} failures processed, {m_q_updates} Q-updates, {p_promotions} promotions")
+
+
+def _llm_extract_step(
+    workspace_id: str,
+    transcript_path: Path,
+    db: Any,
+    config: ForgeConfig,
+) -> None:
+    """LLM-based extraction of failures and decisions from transcript."""
+    from forge.engines.extractor import llm_extract
+
+    extracted = llm_extract(transcript_path, model=config.llm_model)
+    if not extracted:
+        return
+
+    for item in extracted:
+        if item["type"] == "failure":
+            # Check for duplicate pattern
+            existing = get_failure_by_pattern(db, workspace_id, item["pattern"])
+            if existing:
+                continue
+            failure = Failure(
+                workspace_id=workspace_id,
+                pattern=item["pattern"],
+                avoid_hint=item["hint"],
+                hint_quality=item["quality"],
+                q=initial_q(item["quality"], config),
+                source="llm_extract",
+                tags=item.get("tags", []),
+                last_used=datetime.now(UTC),
+            )
+            insert_failure(db, failure)
+            print(f"[forge] LLM extracted failure: {item['pattern']}")
+
+        elif item["type"] == "decision":
+            decision = Decision(
+                workspace_id=workspace_id,
+                statement=item["statement"],
+                rationale=item.get("rationale", ""),
+                tags=item.get("tags", []),
+                q=config.initial_q_decision,
+            )
+            insert_decision(db, decision)
+            print(f"[forge] LLM extracted decision: {item['statement'][:60]}")
+
+    print(f"[forge] LLM extraction: {len(extracted)} items extracted")

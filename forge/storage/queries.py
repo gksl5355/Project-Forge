@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from datetime import datetime, UTC
 
-from forge.storage.models import Decision, Failure, Knowledge, Rule, Session
+from forge.storage.models import Decision, Failure, Knowledge, Rule, Session, TeamRun
+
+logger = logging.getLogger("forge")
 
 
 # ---------------------------------------------------------------------------
@@ -16,7 +19,6 @@ from forge.storage.models import Decision, Failure, Knowledge, Rule, Session
 def _parse_dt(value: str | None) -> datetime | None:
     if value is None:
         return None
-    # SQLite stores datetimes as ISO strings
     try:
         return datetime.fromisoformat(value)
     except ValueError:
@@ -27,11 +29,25 @@ def _dt_str(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
 
 
+def _safe_json_loads(value: str | None, default: list | dict | None = None) -> list | dict:
+    """json.loads with exception handling (v0 fix #1)."""
+    if default is None:
+        default = []
+    if not value:
+        return default
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        logger.warning("Failed to parse JSON: %s", value[:100] if value else "")
+        return default
+
+
 # ---------------------------------------------------------------------------
 # Failure
 # ---------------------------------------------------------------------------
 
 def _row_to_failure(row: sqlite3.Row) -> Failure:
+    keys = row.keys()
     return Failure(
         id=row["id"],
         workspace_id=row["workspace_id"],
@@ -44,10 +60,11 @@ def _row_to_failure(row: sqlite3.Row) -> Failure:
         times_seen=row["times_seen"],
         times_helped=row["times_helped"],
         times_warned=row["times_warned"],
-        tags=json.loads(row["tags"] or "[]"),
-        projects_seen=json.loads(row["projects_seen"] or "[]"),
+        tags=_safe_json_loads(row["tags"]),
+        projects_seen=_safe_json_loads(row["projects_seen"]),
         source=row["source"],
         review_flag=bool(row["review_flag"]),
+        active=bool(row["active"]) if "active" in keys else True,
         last_used=_parse_dt(row["last_used"]),
         created_at=_parse_dt(row["created_at"]) or datetime.now(UTC),
         updated_at=_parse_dt(row["updated_at"]) or datetime.now(UTC),
@@ -60,9 +77,9 @@ def insert_failure(db: sqlite3.Connection, failure: Failure) -> int:
         INSERT INTO failures
             (workspace_id, pattern, observed_error, likely_cause, avoid_hint,
              hint_quality, q, times_seen, times_helped, times_warned,
-             tags, projects_seen, source, review_flag, last_used,
+             tags, projects_seen, source, review_flag, active, last_used,
              created_at, updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,
         (
             failure.workspace_id,
@@ -79,6 +96,7 @@ def insert_failure(db: sqlite3.Connection, failure: Failure) -> int:
             json.dumps(failure.projects_seen),
             failure.source,
             int(failure.review_flag),
+            int(failure.active),
             _dt_str(failure.last_used),
             _dt_str(failure.created_at),
             _dt_str(failure.updated_at),
@@ -113,18 +131,21 @@ def list_failures(
     workspace_id: str,
     sort_by: str = "q",
     include_global: bool = True,
+    active_only: bool = True,
 ) -> list[Failure]:
     allowed_sort = {"q", "times_seen", "created_at", "updated_at", "last_used"}
     order_col = sort_by if sort_by in allowed_sort else "q"
 
+    active_clause = " AND active = 1" if active_only else ""
+
     if include_global:
         rows = db.execute(
-            f"SELECT * FROM failures WHERE workspace_id IN (?, '__global__') ORDER BY {order_col} DESC",
+            f"SELECT * FROM failures WHERE workspace_id IN (?, '__global__'){active_clause} ORDER BY {order_col} DESC",
             (workspace_id,),
         ).fetchall()
     else:
         rows = db.execute(
-            f"SELECT * FROM failures WHERE workspace_id = ? ORDER BY {order_col} DESC",
+            f"SELECT * FROM failures WHERE workspace_id = ?{active_clause} ORDER BY {order_col} DESC",
             (workspace_id,),
         ).fetchall()
     return [_row_to_failure(r) for r in rows]
@@ -137,7 +158,7 @@ def update_failure(db: sqlite3.Connection, failure: Failure) -> None:
             observed_error = ?, likely_cause = ?, avoid_hint = ?,
             hint_quality = ?, q = ?, times_seen = ?, times_helped = ?,
             times_warned = ?, tags = ?, projects_seen = ?, source = ?,
-            review_flag = ?, last_used = ?, updated_at = ?
+            review_flag = ?, active = ?, last_used = ?, updated_at = ?
         WHERE id = ?
         """,
         (
@@ -153,10 +174,20 @@ def update_failure(db: sqlite3.Connection, failure: Failure) -> None:
             json.dumps(failure.projects_seen),
             failure.source,
             int(failure.review_flag),
+            int(failure.active),
             _dt_str(failure.last_used),
             _dt_str(datetime.now(UTC)),
             failure.id,
         ),
+    )
+    db.commit()
+
+
+def soft_delete_failure(db: sqlite3.Connection, failure_id: int) -> None:
+    """Soft-delete a failure by setting active=0."""
+    db.execute(
+        "UPDATE failures SET active = 0, updated_at = ? WHERE id = ?",
+        (_dt_str(datetime.now(UTC)), failure_id),
     )
     db.commit()
 
@@ -166,7 +197,7 @@ def list_flagged_failures(
 ) -> list[Failure]:
     """review_flag=True인 실패 목록 반환."""
     rows = db.execute(
-        "SELECT * FROM failures WHERE workspace_id = ? AND review_flag = 1 ORDER BY q DESC",
+        "SELECT * FROM failures WHERE workspace_id = ? AND review_flag = 1 AND active = 1 ORDER BY q DESC",
         (workspace_id,),
     ).fetchall()
     return [_row_to_failure(r) for r in rows]
@@ -175,22 +206,21 @@ def list_flagged_failures(
 def search_by_tags(
     db: sqlite3.Connection, workspace_id: str, tags: list[str]
 ) -> list[Failure]:
-    """Return failures matching ANY of the given tags (json_each full scan)."""
-    results: list[Failure] = []
-    seen_ids: set[int] = set()
-    for tag in tags:
-        rows = db.execute(
-            """
-            SELECT f.* FROM failures f, json_each(f.tags) t
-            WHERE f.workspace_id IN (?, '__global__') AND t.value = ?
-            """,
-            (workspace_id, tag),
-        ).fetchall()
-        for row in rows:
-            if row["id"] not in seen_ids:
-                seen_ids.add(row["id"])
-                results.append(_row_to_failure(row))
-    return results
+    """Return failures matching ANY of the given tags (single query, v0 fix #2)."""
+    if not tags:
+        return []
+    placeholders = ",".join("?" for _ in tags)
+    rows = db.execute(
+        f"""
+        SELECT DISTINCT f.* FROM failures f, json_each(f.tags) t
+        WHERE f.workspace_id IN (?, '__global__')
+          AND f.active = 1
+          AND t.value IN ({placeholders})
+        ORDER BY f.q DESC
+        """,
+        (workspace_id, *tags),
+    ).fetchall()
+    return [_row_to_failure(r) for r in rows]
 
 
 # ---------------------------------------------------------------------------
@@ -203,11 +233,11 @@ def _row_to_decision(row: sqlite3.Row) -> Decision:
         workspace_id=row["workspace_id"],
         statement=row["statement"],
         rationale=row["rationale"],
-        alternatives=json.loads(row["alternatives"] or "[]"),
+        alternatives=_safe_json_loads(row["alternatives"]),
         q=row["q"],
         status=row["status"],
         superseded_by=row["superseded_by"],
-        tags=json.loads(row["tags"] or "[]"),
+        tags=_safe_json_loads(row["tags"]),
         last_used=_parse_dt(row["last_used"]),
         created_at=_parse_dt(row["created_at"]) or datetime.now(UTC),
         updated_at=_parse_dt(row["updated_at"]) or datetime.now(UTC),
@@ -358,7 +388,7 @@ def _row_to_knowledge(row: sqlite3.Row) -> Knowledge:
         content=row["content"],
         source=row["source"],
         q=row["q"],
-        tags=json.loads(row["tags"] or "[]"),
+        tags=_safe_json_loads(row["tags"]),
         promoted_from=row["promoted_from"],
         last_used=_parse_dt(row["last_used"]),
         created_at=_parse_dt(row["created_at"]) or datetime.now(UTC),
@@ -415,7 +445,7 @@ def _row_to_session(row: sqlite3.Row) -> Session:
         id=row["id"],
         session_id=row["session_id"],
         workspace_id=row["workspace_id"],
-        warnings_injected=json.loads(row["warnings_injected"] or "[]"),
+        warnings_injected=_safe_json_loads(row["warnings_injected"]),
         started_at=_parse_dt(row["started_at"]) or datetime.now(UTC),
         ended_at=_parse_dt(row["ended_at"]),
         failures_encountered=row["failures_encountered"] if "failures_encountered" in keys else 0,
@@ -488,3 +518,68 @@ def update_session_metrics(
         ),
     )
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# TeamRun
+# ---------------------------------------------------------------------------
+
+def _row_to_team_run(row: sqlite3.Row) -> TeamRun:
+    return TeamRun(
+        id=row["id"],
+        workspace_id=row["workspace_id"],
+        run_id=row["run_id"],
+        complexity=row["complexity"],
+        team_config=row["team_config"],
+        duration_min=row["duration_min"],
+        success_rate=row["success_rate"],
+        retry_rate=row["retry_rate"],
+        scope_violations=row["scope_violations"],
+        verdict=row["verdict"],
+        agents=_safe_json_loads(row["agents"]),
+        created_at=_parse_dt(row["created_at"]) or datetime.now(UTC),
+    )
+
+
+def insert_team_run(db: sqlite3.Connection, team_run: TeamRun) -> int:
+    cur = db.execute(
+        """
+        INSERT INTO team_runs
+            (workspace_id, run_id, complexity, team_config, duration_min,
+             success_rate, retry_rate, scope_violations, verdict, agents, created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        """,
+        (
+            team_run.workspace_id,
+            team_run.run_id,
+            team_run.complexity,
+            team_run.team_config,
+            team_run.duration_min,
+            team_run.success_rate,
+            team_run.retry_rate,
+            team_run.scope_violations,
+            team_run.verdict,
+            json.dumps(team_run.agents),
+            _dt_str(team_run.created_at),
+        ),
+    )
+    db.commit()
+    return cur.lastrowid
+
+
+def get_team_run(db: sqlite3.Connection, run_id: str) -> TeamRun | None:
+    row = db.execute(
+        "SELECT * FROM team_runs WHERE run_id = ?",
+        (run_id,),
+    ).fetchone()
+    return _row_to_team_run(row) if row else None
+
+
+def list_team_runs(
+    db: sqlite3.Connection, workspace_id: str, limit: int = 10
+) -> list[TeamRun]:
+    rows = db.execute(
+        "SELECT * FROM team_runs WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ?",
+        (workspace_id, limit),
+    ).fetchall()
+    return [_row_to_team_run(r) for r in rows]

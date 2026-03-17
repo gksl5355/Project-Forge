@@ -63,10 +63,14 @@ def install_hooks() -> None:
             "hooks": [{"type": "command", "command": detect_cmd}],
         })
 
-    _SETTINGS_PATH.write_text(
-        json.dumps(settings, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    try:
+        _SETTINGS_PATH.write_text(
+            json.dumps(settings, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except OSError as e:
+        print(f"[forge] Warning: Failed to write settings.json: {e}")
+        raise
 
 
 def _entry_exists(hook_list: list, command: str) -> bool:

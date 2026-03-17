@@ -29,6 +29,18 @@ class ForgeConfig:
     initial_q_environmental: float = 0.3
     initial_q_decision: float = 0.5
     initial_q_knowledge: float = 0.5
+    # v1: vector search
+    vector_search_enabled: bool = True
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    lambda_weight: float = 0.5        # hybrid score: (1-λ)*sim + λ*Q
+    dedup_threshold: float = 0.8      # cosine similarity for dedup
+    # v1: context budget
+    total_max_tokens: int = 4000
+    team_context_tokens: int = 1000
+    forge_context_tokens: int = 2500
+    # v1: LLM extraction
+    llm_extract_enabled: bool = False
+    llm_model: str = "claude-haiku-4-5-20251001"
 
 
 _DEFAULT_CONFIG_PATH = Path.home() / ".forge" / "config.yml"

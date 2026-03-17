@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from forge.config import ForgeConfig
-from forge.storage.models import Decision, Failure, Knowledge, Rule
+from forge.storage.models import Decision, Failure, Knowledge, Rule, TeamRun
 
 
 def format_l0(failures: list[Failure]) -> str:
@@ -103,3 +103,98 @@ def build_context(
         parts.append(format_rules(active_rules))
 
     return "\n".join(parts)
+
+
+def format_team_runs(runs: list[TeamRun]) -> str:
+    """Format team runs for context output.
+
+    형식: [TEAM] {run_id} | {complexity} | config:{team_config} | success:{success_rate:.0%}
+    Include verdict if present.
+    """
+    lines = []
+    for r in runs:
+        verdict_str = f" | verdict:{r.verdict}" if r.verdict else ""
+        success_pct = f"{r.success_rate:.0%}" if r.success_rate is not None else "N/A"
+        lines.append(
+            f"[TEAM] {r.run_id} | {r.complexity} | config:{r.team_config} | "
+            f"success:{success_pct}{verdict_str}"
+        )
+    return "\n".join(lines)
+
+
+def estimate_tokens(text: str) -> int:
+    """Simple token estimation: len(text) // 4 (rough char-to-token ratio)."""
+    return len(text) // 4
+
+
+def trim_to_budget(text: str, max_tokens: int) -> str:
+    """Trim text to fit within token budget.
+
+    If estimated tokens exceed max_tokens, truncate lines from bottom.
+    Add "... (truncated)" marker.
+    """
+    estimated = estimate_tokens(text)
+    if estimated <= max_tokens:
+        return text
+
+    lines = text.split("\n")
+    while lines and estimate_tokens("\n".join(lines)) > max_tokens:
+        lines.pop()
+
+    if lines:
+        return "\n".join(lines) + "\n... (truncated)"
+    return "... (truncated)"
+
+
+def build_unified_context(
+    failures: list[Failure],
+    rules: list[Rule],
+    config: ForgeConfig,
+    decisions: list[Decision] | None = None,
+    knowledge_list: list[Knowledge] | None = None,
+    team_runs: list[TeamRun] | None = None,
+    team_failures: list[Failure] | None = None,
+) -> str:
+    """Build unified context combining forge experience and team history.
+
+    - Calls build_context for forge section, trims to forge_context_tokens
+    - Builds team section (recent runs + team-related failures), trims to team_context_tokens
+    - Dedup: if a team_failure pattern exists in forge failures, skip it
+    - Combines under '## Forge Experience' and '## Team History' headers
+    - Total trimmed to total_max_tokens
+    """
+    # Build forge experience section
+    forge_context = build_context(failures, rules, config, decisions, knowledge_list)
+    trimmed_forge = trim_to_budget(forge_context, config.forge_context_tokens)
+
+    # Build team section
+    team_parts: list[str] = []
+
+    # Add team runs if available
+    if team_runs:
+        team_parts.append("### Recent Team Runs")
+        team_parts.append(format_team_runs(team_runs))
+
+    # Add team-specific failures (dedup with forge failures)
+    forge_patterns = {f.pattern for f in failures}
+    if team_failures:
+        filtered_team_failures = [f for f in team_failures if f.pattern not in forge_patterns]
+        if filtered_team_failures:
+            team_parts.append("### Team-Related Failures")
+            team_parts.append(format_l1(filtered_team_failures))
+
+    team_section = "\n".join(team_parts)
+    trimmed_team = trim_to_budget(team_section, config.team_context_tokens)
+
+    # Combine with headers
+    final_parts: list[str] = []
+    if trimmed_forge:
+        final_parts.append("## Forge Experience")
+        final_parts.append(trimmed_forge)
+    if trimmed_team:
+        final_parts.append("## Team History")
+        final_parts.append(trimmed_team)
+
+    combined = "\n".join(final_parts)
+    result = trim_to_budget(combined, config.total_max_tokens)
+    return result

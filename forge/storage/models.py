@@ -20,6 +20,7 @@ class Failure:
     projects_seen: list[str] = field(default_factory=list)
     source: str = "manual"     # auto | manual | organic
     review_flag: bool = False
+    active: bool = True
     observed_error: str | None = None
     likely_cause: str | None = None
     last_used: datetime | None = None
@@ -79,4 +80,20 @@ class Session:
     failures_encountered: int = 0
     q_updates_count: int = 0
     promotions_count: int = 0
+    id: int | None = None
+
+
+@dataclass
+class TeamRun:
+    workspace_id: str
+    run_id: str
+    complexity: str | None = None      # SIMPLE | MEDIUM | COMPLEX
+    team_config: str | None = None     # e.g. "sonnet:2 + haiku:1"
+    duration_min: float | None = None
+    success_rate: float | None = None
+    retry_rate: float | None = None
+    scope_violations: int = 0
+    verdict: str | None = None
+    agents: list[dict] = field(default_factory=list)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     id: int | None = None
