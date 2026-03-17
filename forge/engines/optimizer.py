@@ -45,6 +45,8 @@ class ExperimentResult:
     coverage: float
     waste: float
     sessions_evaluated: int
+    composite_fitness: float = 0.0
+    promotion_precision: float = 0.0
 
 
 @dataclass
@@ -65,13 +67,17 @@ ProgressFn = Callable[[int, int, str, ExperimentResult, bool], None] | None
 # Parameter space
 # ---------------------------------------------------------------------------
 
-PARAM_GRID: dict[str, list[int]] = {
+PARAM_GRID: dict[str, list[int | float]] = {
     "l0_max_entries": [5, 10, 20, 30, 50],
     "l1_project_entries": [1, 2, 3, 5],
     "l1_global_entries": [0, 1, 2, 3],
     "rules_max_entries": [3, 5, 10],
     "total_max_tokens": [1000, 1500, 2000, 2500, 3000, 4000],
     "forge_context_tokens": [1000, 1500, 2000, 2500],
+    "promote_threshold": [2, 3, 4],
+    "promote_min_times_seen": [1, 2, 3, 5],
+    "alpha": [0.05, 0.1, 0.15, 0.2],
+    "decay_daily": [0.001, 0.005, 0.01, 0.02],
 }
 
 
@@ -108,6 +114,19 @@ def _extract_warned_patterns(context_text: str) -> list[str]:
                 if pattern and pattern not in patterns:
                     patterns.append(pattern)
     return patterns
+
+
+def compute_composite_fitness(
+    qwhr: float,
+    token_efficiency: float,
+    promotion_precision: float,
+) -> float:
+    """Composite fitness = 0.6*QWHR + 0.25*token_eff_norm + 0.15*promo_precision.
+
+    token_efficiency is normalized: min(1.0, token_efficiency * 100).
+    """
+    token_eff_norm = min(1.0, token_efficiency * 100)
+    return 0.6 * qwhr + 0.25 * token_eff_norm + 0.15 * promotion_precision
 
 
 def compute_qwhr(
@@ -184,15 +203,31 @@ class ExperimentSimulator:
             tokens_used=tokens_used,
         )
 
+    def _compute_promotion_precision(self) -> float:
+        """Compute precision of globally promoted failures.
+
+        Ratio of global failures with times_helped > 0 to total global failures.
+        Returns 0.0 if no global failures exist.
+        """
+        global_failures = list_failures(self.db, "__global__", include_global=False)
+        if not global_failures:
+            return 0.0
+        helped = sum(1 for f in global_failures if f.times_helped > 0)
+        return helped / len(global_failures)
+
     def evaluate_config(
         self, test_config: ForgeConfig, sessions: list[Session],
     ) -> ExperimentResult:
         """Evaluate a config by averaging across all sessions."""
+        promotion_precision = self._compute_promotion_precision()
+
         if not sessions:
             return ExperimentResult(
                 config=test_config, qwhr=0.0,
                 token_efficiency=0.0, coverage=0.0, waste=0.0,
                 sessions_evaluated=0,
+                composite_fitness=0.0,
+                promotion_precision=promotion_precision,
             )
 
         total_qwhr = 0.0
@@ -215,6 +250,7 @@ class ExperimentSimulator:
         token_efficiency = total_helped / total_tokens if total_tokens > 0 else 0.0
         coverage = total_warned / (len(self.failures) * n) if self.failures else 0.0
         waste = total_not_helped / total_warned if total_warned > 0 else 0.0
+        composite = compute_composite_fitness(avg_qwhr, token_efficiency, promotion_precision)
 
         return ExperimentResult(
             config=test_config,
@@ -223,6 +259,8 @@ class ExperimentSimulator:
             coverage=coverage,
             waste=waste,
             sessions_evaluated=n,
+            composite_fitness=composite,
+            promotion_precision=promotion_precision,
         )
 
 
@@ -285,19 +323,19 @@ def run_autoresearch(
                     result = simulator.evaluate_config(variant, sessions)
                     experiments.append(result)
 
-                    is_improved = result.qwhr > best.qwhr
+                    is_improved = result.composite_fitness > best.composite_fitness
                     if on_progress:
                         on_progress(
                             experiment_count, max_experiments,
                             f"{param}={val}", result, is_improved,
                         )
 
-                    if result.qwhr > best_for_param.qwhr:
+                    if result.composite_fitness > best_for_param.composite_fitness:
                         best_for_param = result
                         best_val_for_param = val
 
                 # Apply best value for this parameter
-                if best_for_param.qwhr > best.qwhr:
+                if best_for_param.composite_fitness > best.composite_fitness:
                     best = best_for_param
                     setattr(current_config, param, best_val_for_param)
                     changed = True
@@ -307,5 +345,5 @@ def run_autoresearch(
         best=best,
         experiments=experiments,
         total_experiments=len(experiments) - 1,  # exclude baseline
-        improved=best.qwhr > baseline.qwhr,
+        improved=best.composite_fitness > baseline.composite_fitness,
     )

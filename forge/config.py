@@ -24,6 +24,7 @@ class ForgeConfig:
     decay_daily: float = 0.005
     q_min: float = 0.05
     promote_threshold: int = 2
+    promote_min_times_seen: int = 3
     knowledge_promote_q: float = 0.8
     knowledge_promote_helped: int = 5
     # initial_q
@@ -117,6 +118,8 @@ def _validate_config(config: ForgeConfig) -> ForgeConfig:
         config.rules_max_entries = 10
     if config.promote_threshold <= 0:
         config.promote_threshold = 2
+    if config.promote_min_times_seen <= 0:
+        config.promote_min_times_seen = 3
     if config.knowledge_promote_helped <= 0:
         config.knowledge_promote_helped = 5
     if config.total_max_tokens <= 0:

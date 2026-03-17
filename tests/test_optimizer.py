@@ -8,10 +8,12 @@ import pytest
 
 from forge.config import ForgeConfig, save_config_yaml, load_config
 from forge.engines.optimizer import (
+    ExperimentResult,
     ExperimentSimulator,
     PARAM_GRID,
     ParameterSpace,
     _extract_warned_patterns,
+    compute_composite_fitness,
     compute_qwhr,
     run_autoresearch,
 )
@@ -302,6 +304,114 @@ class TestRunAutoresearch:
         result = run_autoresearch("test", db, config, max_experiments=30)
 
         assert result.best.qwhr >= result.baseline.qwhr
+
+
+# ---------------------------------------------------------------------------
+# compute_composite_fitness
+# ---------------------------------------------------------------------------
+
+class TestComputeCompositeFitness:
+    def test_all_zero(self):
+        assert compute_composite_fitness(0.0, 0.0, 0.0) == pytest.approx(0.0)
+
+    def test_all_one(self):
+        """Max inputs → 0.6*1 + 0.25*1 + 0.15*1 = 1.0."""
+        # token_efficiency=0.01 normalizes to 1.0 (0.01*100=1.0)
+        assert compute_composite_fitness(1.0, 0.01, 1.0) == pytest.approx(1.0)
+
+    def test_mixed(self):
+        """QWHR=0.8, token_eff=0.004 (norm=0.4), promo=0.5 → 0.6*0.8+0.25*0.4+0.15*0.5."""
+        result = compute_composite_fitness(0.8, 0.004, 0.5)
+        expected = 0.6 * 0.8 + 0.25 * 0.4 + 0.15 * 0.5
+        assert result == pytest.approx(expected)
+
+    def test_token_eff_capped_at_one(self):
+        """token_efficiency * 100 > 1.0 is capped at 1.0."""
+        uncapped = compute_composite_fitness(0.5, 1.0, 0.5)
+        capped = compute_composite_fitness(0.5, 999.0, 0.5)
+        assert uncapped == pytest.approx(capped)
+
+
+# ---------------------------------------------------------------------------
+# PARAM_GRID new parameters
+# ---------------------------------------------------------------------------
+
+class TestParamGridNewParams:
+    def test_includes_new_params(self):
+        new_params = {"promote_threshold", "promote_min_times_seen", "alpha", "decay_daily"}
+        assert new_params.issubset(set(PARAM_GRID.keys()))
+
+    def test_new_param_values(self):
+        assert PARAM_GRID["promote_threshold"] == [2, 3, 4]
+        assert PARAM_GRID["promote_min_times_seen"] == [1, 2, 3, 5]
+        assert PARAM_GRID["alpha"] == [0.05, 0.1, 0.15, 0.2]
+        assert PARAM_GRID["decay_daily"] == [0.001, 0.005, 0.01, 0.02]
+
+
+# ---------------------------------------------------------------------------
+# ExperimentResult new fields
+# ---------------------------------------------------------------------------
+
+class TestExperimentResultNewFields:
+    def test_has_composite_fitness(self):
+        config = ForgeConfig()
+        result = ExperimentResult(
+            config=config, qwhr=0.7, token_efficiency=0.003,
+            coverage=0.5, waste=0.2, sessions_evaluated=1,
+            composite_fitness=0.65, promotion_precision=0.8,
+        )
+        assert result.composite_fitness == pytest.approx(0.65)
+        assert result.promotion_precision == pytest.approx(0.8)
+
+    def test_defaults_to_zero(self):
+        config = ForgeConfig()
+        result = ExperimentResult(
+            config=config, qwhr=0.5, token_efficiency=0.002,
+            coverage=0.4, waste=0.3, sessions_evaluated=1,
+        )
+        assert result.composite_fitness == 0.0
+        assert result.promotion_precision == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Best selected by composite fitness
+# ---------------------------------------------------------------------------
+
+class TestBestSelectedByComposite:
+    def test_best_uses_composite_fitness(self, db):
+        """Optimizer selects best by composite_fitness, not just QWHR."""
+        for i in range(3):
+            _make_failure(db, f"pat_{i}", q=0.7, times_warned=10, times_helped=7)
+        _make_session(db, "s1", warnings_injected=[f"pat_{i}" for i in range(3)])
+
+        config = ForgeConfig()
+        result = run_autoresearch("test", db, config, max_experiments=30)
+
+        # best.composite_fitness >= baseline.composite_fitness always
+        assert result.best.composite_fitness >= result.baseline.composite_fitness
+        # improved flag consistent with composite
+        assert result.improved == (result.best.composite_fitness > result.baseline.composite_fitness)
+
+
+# ---------------------------------------------------------------------------
+# Greedy sweep includes new params
+# ---------------------------------------------------------------------------
+
+class TestGreedySweepNewParams:
+    def test_new_params_in_sweep(self):
+        config = ForgeConfig()
+        swept_params = {p for p, _, _ in ParameterSpace.greedy_sweep(config)}
+        assert "promote_threshold" in swept_params
+        assert "promote_min_times_seen" in swept_params
+        assert "alpha" in swept_params
+        assert "decay_daily" in swept_params
+
+    def test_sweep_sets_new_param_values(self):
+        config = ForgeConfig()
+        for param, val, variant in ParameterSpace.greedy_sweep(config):
+            if param == "alpha":
+                assert getattr(variant, "alpha") == val
+                break
 
 
 # ---------------------------------------------------------------------------

@@ -9,8 +9,11 @@ from forge.storage.models import Failure, Knowledge
 
 
 def check_global_promote(failure: Failure, config: ForgeConfig) -> bool:
-    """projects_seen 수가 임계값 이상이면 전역 승격 대상."""
-    return len(failure.projects_seen) >= config.promote_threshold
+    """projects_seen and times_seen both meet thresholds for global promotion."""
+    return (
+        len(failure.projects_seen) >= config.promote_threshold
+        and failure.times_seen >= config.promote_min_times_seen
+    )
 
 
 def promote_to_global(

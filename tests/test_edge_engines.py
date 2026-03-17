@@ -510,6 +510,7 @@ class TestWritebackPromotion:
             avoid_hint="avoid this",
             hint_quality="preventable",
             q=0.5,
+            times_seen=3,  # >= promote_min_times_seen default (3)
             projects_seen=["proj1", "proj2"],  # >= 2
         )
         insert_failure(db, f)

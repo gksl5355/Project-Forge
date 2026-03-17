@@ -63,6 +63,37 @@ def test_check_global_promote_empty_projects():
     assert check_global_promote(failure, config) is False
 
 
+def test_promote_blocked_by_min_times_seen():
+    config = ForgeConfig(promote_threshold=2, promote_min_times_seen=3)
+    failure = _make_failure(projects_seen=["proj_a", "proj_b"])
+    failure.times_seen = 2
+    assert check_global_promote(failure, config) is False
+
+
+def test_promote_passes_with_min_times_seen():
+    config = ForgeConfig(promote_threshold=2, promote_min_times_seen=3)
+    failure = _make_failure(projects_seen=["proj_a", "proj_b"])
+    failure.times_seen = 3
+    assert check_global_promote(failure, config) is True
+
+
+def test_promote_custom_min_times_seen():
+    config = ForgeConfig(promote_threshold=2, promote_min_times_seen=10)
+    failure = _make_failure(projects_seen=["proj_a", "proj_b"])
+    failure.times_seen = 9
+    assert check_global_promote(failure, config) is False
+    failure.times_seen = 10
+    assert check_global_promote(failure, config) is True
+
+
+def test_promote_default_min_times_seen():
+    config = ForgeConfig(promote_threshold=2)
+    assert config.promote_min_times_seen == 3
+    failure = _make_failure(projects_seen=["proj_a", "proj_b"])
+    failure.times_seen = 3
+    assert check_global_promote(failure, config) is True
+
+
 # --- promote_to_global ---
 
 def test_promote_to_global_workspace_is_global():

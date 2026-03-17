@@ -665,13 +665,24 @@ def cmd_optimize(
         return
 
     typer.echo(f"\n=== Results ===")
-    typer.echo(f"Baseline QWHR: {result.baseline.qwhr:.2f}")
-    if result.baseline.qwhr > 0:
-        pct = (result.best.qwhr - result.baseline.qwhr) / result.baseline.qwhr * 100
-        typer.echo(f"Best QWHR:     {result.best.qwhr:.2f} ({pct:+.0f}%)")
+    b = result.baseline
+    best = result.best
+    typer.echo(
+        f"Baseline:  QWHR={b.qwhr:.2f}  TokenEff={b.token_efficiency:.3f}"
+        f"  PromoPrecision={b.promotion_precision:.2f}  Fitness={b.composite_fitness:.2f}"
+    )
+    if b.composite_fitness > 0:
+        pct = (best.composite_fitness - b.composite_fitness) / b.composite_fitness * 100
+        typer.echo(
+            f"Best:      QWHR={best.qwhr:.2f}  TokenEff={best.token_efficiency:.3f}"
+            f"  PromoPrecision={best.promotion_precision:.2f}  Fitness={best.composite_fitness:.2f} ({pct:+.0f}%)"
+        )
     else:
-        typer.echo(f"Best QWHR:     {result.best.qwhr:.2f}")
-    typer.echo(f"Experiments:   {result.total_experiments}")
+        typer.echo(
+            f"Best:      QWHR={best.qwhr:.2f}  TokenEff={best.token_efficiency:.3f}"
+            f"  PromoPrecision={best.promotion_precision:.2f}  Fitness={best.composite_fitness:.2f}"
+        )
+    typer.echo(f"Experiments: {result.total_experiments}")
 
     typer.echo(f"\n=== Recommended Config ===")
     for param in PARAM_GRID:
@@ -686,6 +697,39 @@ def cmd_optimize(
         typer.echo(f"\nConfig saved to ~/.forge/config.yml")
     elif not result.improved:
         typer.echo(f"\nCurrent config is already optimal.")
+
+
+# ---------------------------------------------------------------------------
+# forge measure
+# ---------------------------------------------------------------------------
+
+@app.command("measure")
+def cmd_measure(
+    workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
+) -> None:
+    """현재 워크스페이스의 최적화 메트릭 측정."""
+    from forge.engines.measure import run_measure
+
+    db = get_connection()
+    config = load_config()
+
+    result = run_measure(workspace, db, config)
+
+    typer.echo(f"=== Forge Metrics (workspace: {workspace}) ===")
+    typer.echo(f"  QWHR:                  {result.qwhr:.2f}")
+    typer.echo(f"  Promotion precision:   {result.promotion_precision:.2f}")
+    sign = "+" if result.l1_vs_l0_help_rate >= 0 else ""
+    typer.echo(f"  L1 vs L0 help rate:   {sign}{result.l1_vs_l0_help_rate:.2f}")
+    typer.echo(f"  Helped per 1K tokens:  {result.helped_per_1k_tokens:.2f}")
+    typer.echo(f"  Q convergence speed:   {result.q_convergence_speed:.1f} sessions")
+    typer.echo(f"  Failures: {result.total_failures} | Sessions: {result.total_sessions}")
+    typer.echo("")
+    typer.echo("  Section effectiveness:")
+    for section, value in result.section_effectiveness.items():
+        if value is None:
+            typer.echo(f"    {section}:   N/A")
+        else:
+            typer.echo(f"    {section}:   {value:.2f}")
 
 
 if __name__ == "__main__":
