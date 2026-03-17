@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import shutil
-from datetime import datetime, UTC
 from pathlib import Path
 
 _SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
@@ -13,17 +12,22 @@ _SKILLS_DIR = Path.home() / ".claude" / "skills"
 _HOOK_TEMPLATES = Path(__file__).parent / "templates"
 _SKILL_SOURCES = Path(__file__).parent.parent / "skills"
 
+# Forge's recommended env values
+_RECOMMENDED_ENV = {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+}
+
 
 def install_hooks(dry_run: bool = False) -> list[str]:
     """Install Forge hooks into Claude Code settings.json + copy scripts.
 
     Merge strategy:
     - Hooks: append-only (existing hooks preserved, Forge hooks added)
-    - Env vars: setdefault (existing values never overwritten)
-    - TEAMMATE_COMMAND: updated only if not already Forge-managed
+    - Env vars: set if missing, WARN if existing value differs
+    - TEAMMATE_COMMAND: always points to Forge-managed version
     - Backup: settings.json.bak created before any changes
 
-    Returns list of changes made (or would-be-made in dry_run).
+    Returns list of changes/warnings.
     """
     changes: list[str] = []
 
@@ -38,7 +42,7 @@ def install_hooks(dry_run: bool = False) -> list[str]:
             if not dry_run:
                 shutil.copy2(src, dst)
                 dst.chmod(0o755)
-            changes.append(f"  hook: {dst}")
+            changes.append(f"  + {dst}")
 
     # --- settings.json ---
     if _SETTINGS_PATH.exists():
@@ -54,7 +58,7 @@ def install_hooks(dry_run: bool = False) -> list[str]:
         if not dry_run:
             _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    # Hooks: append-only
+    # Hooks: append-only (never remove existing)
     hooks = settings.setdefault("hooks", {})
     hook_configs = [
         ("SessionStart", str(_HOOKS_DIR / "resume.sh"), ""),
@@ -68,30 +72,43 @@ def install_hooks(dry_run: bool = False) -> list[str]:
                 "matcher": matcher,
                 "hooks": [{"type": "command", "command": cmd}],
             })
-            changes.append(f"  settings.json: hooks.{event} += {Path(cmd).name}")
+            changes.append(f"  + hooks.{event}: {Path(cmd).name}")
+        else:
+            changes.append(f"  = hooks.{event}: {Path(cmd).name} (already set)")
 
-    # Env: setdefault (never overwrite user's existing values)
+    # Env: set + warn on conflict
     env = settings.setdefault("env", {})
     teammate_path = str(_HOOKS_DIR / "teammate.sh")
 
-    if "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" not in env:
-        env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] = "1"
-        changes.append("  settings.json: env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = 1")
+    for key, recommended in _RECOMMENDED_ENV.items():
+        current = env.get(key)
+        if current is None:
+            env[key] = recommended
+            changes.append(f"  + env.{key} = {recommended}")
+        elif current != recommended:
+            changes.append(
+                f"  ! env.{key} = {current} (Forge recommends: {recommended})"
+            )
+        else:
+            changes.append(f"  = env.{key} = {current} (ok)")
 
+    # TEAMMATE_COMMAND: always set to Forge path
     current_teammate = env.get("CLAUDE_CODE_TEAMMATE_COMMAND", "")
-    if not current_teammate or "forge" not in current_teammate:
-        old = current_teammate or "(none)"
-        env["CLAUDE_CODE_TEAMMATE_COMMAND"] = teammate_path
-        changes.append(f"  settings.json: env.TEAMMATE_COMMAND: {old} -> {teammate_path}")
+    env["CLAUDE_CODE_TEAMMATE_COMMAND"] = teammate_path
+    if current_teammate and current_teammate != teammate_path:
+        changes.append(f"  ~ env.TEAMMATE_COMMAND: {current_teammate} -> {teammate_path}")
+    elif not current_teammate:
+        changes.append(f"  + env.TEAMMATE_COMMAND = {teammate_path}")
+    else:
+        changes.append(f"  = env.TEAMMATE_COMMAND (ok)")
 
     # Write with backup
     new_text = json.dumps(settings, indent=2, ensure_ascii=False)
     if new_text != original_text and not dry_run:
-        # Backup existing
         if original_text:
             backup = _SETTINGS_PATH.with_suffix(".json.bak")
             backup.write_text(original_text, encoding="utf-8")
-            changes.append(f"  backup: {backup}")
+            changes.append(f"  ~ backup: {backup}")
         _SETTINGS_PATH.write_text(new_text, encoding="utf-8")
 
     return changes
@@ -100,7 +117,7 @@ def install_hooks(dry_run: bool = False) -> list[str]:
 def install_skills(dry_run: bool = False) -> list[str]:
     """Install bundled SKILL.md files to ~/.claude/skills/.
 
-    Existing skills are updated (overwritten) with Forge's bundled version.
+    Always overwrites with Forge's bundled version (skills are Forge-managed).
     Returns list of installed skill paths.
     """
     installed: list[str] = []
@@ -118,7 +135,7 @@ def install_skills(dry_run: bool = False) -> list[str]:
         if not dry_run:
             dst_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(skill_file, dst)
-        installed.append(f"  skill: ~/.claude/skills/{skill_dir.name}/")
+        installed.append(f"  + ~/.claude/skills/{skill_dir.name}/")
 
     return installed
 
