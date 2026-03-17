@@ -43,8 +43,6 @@ forge/
 
 ## Key Documents
 
-- Architecture: `docs/architecture/ARCHITECTURE_v0.2.md`
-- TRD: `docs/trd/TRD_v0.2.md`
 - Migration Log: `docs/MIGRATION_LOG.md`
 
 ## Forge + TO Integration

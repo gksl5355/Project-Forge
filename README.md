@@ -1,258 +1,191 @@
+[English](README.md) | [한국어](README.ko.md)
+
 # Project Forge
 
-**코딩 에이전트가 실수에서 배우게 만드는 도구.**
+**Make your coding agent learn from its mistakes.**
 
-Claude Code를 쓸 때 같은 실수가 반복되거나, 지난번에 찾은 해결법을 다시 잊어버린 적 있나요? Forge는 세션마다 발생한 실패/결정/규칙을 자동으로 기억하고, 다음 세션에서 관련 경험을 주입해줍니다.
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Tests](https://img.shields.io/badge/tests-846_passed-brightgreen?logo=pytest&logoColor=white)](#metrics)
+[![Dependencies](https://img.shields.io/badge/deps-2_(typer%2C_pyyaml)-blue)](#tech-stack)
+[![Schema](https://img.shields.io/badge/schema-v4-orange)](#experiment-tracking)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/gksl5355/Project-Forge?style=flat&logo=github)](https://github.com/gksl5355/Project-Forge)
 
-![Python](https://img.shields.io/badge/Python-3.12+-blue)
-![Tests](https://img.shields.io/badge/tests-846_passed-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-32_modules-blue)
-![Schema](https://img.shields.io/badge/schema-v4-orange)
-![LOC](https://img.shields.io/badge/LOC-10.7k-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-green)
+---
 
-## 이게 뭔데?
+Ever had Claude Code repeat the same mistake across sessions? Forget a fix you found yesterday? Forge automatically remembers what went wrong, what worked, and injects that experience into every future session.
 
-Forge는 Claude Code에 **경험 학습**을 추가하는 도구입니다.
+## How it works
 
 ```
-세션 시작 → Forge가 과거 경험 주입 (이전에 이런 실수 했었어)
-코딩 중   → 같은 실수하면 즉시 경고 (이거 전에도 했는데, 이렇게 해)
-세션 끝   → 이번 세션에서 배운 것 자동 저장
+Session Start               Mid-session                 Session End
+  forge resume                 forge detect                forge writeback
+  ↓                            ↓                           ↓
+  Load Q-ranked patterns       Match stderr to DB          Parse transcript
+  ↓                            ↓                           ↓
+  Inject into context          Warn: "Seen this before,    Update Q-values
+  "Last time this failed,       try: use async with"       Record experiment
+   here's the fix (Q:0.8)"                                 Auto-promote
 ```
 
-설치하면 **아무것도 안 해도 자동으로 돌아갑니다**. 수동 기록도 가능합니다.
+**Install once, forget about it.** Forge runs as Claude Code hooks — no manual intervention needed.
 
-## 설치 (2줄)
+## Quick start
 
 ```bash
 pip install git+https://github.com/gksl5355/Project-Forge.git
 forge setup
 ```
 
-`forge setup`이 한 번에 모든 걸 설정합니다:
+`forge setup` shows exactly what will change and asks before applying:
 
-| 설치되는 것 | 위치 | 설명 |
-|------------|------|------|
-| 경험 데이터베이스 | `~/.forge/forge.db` | SQLite. 실패/결정/규칙/실험 저장 |
-| 자동 학습 hooks | `~/.forge/hooks/*.sh` | 세션 시작/종료/실패 감지 |
-| 팀 스킬 4종 | `~/.claude/skills/` | spawn-team, doctor, debate, ralph |
-| 팀 모델 선택기 | `~/.forge/hooks/teammate.sh` | 에이전트별 모델 자동 라우팅 |
-| Claude Code 설정 | `~/.claude/settings.json` | hooks + 환경변수 자동 패치 |
-
-### 기존 설정이 있어도 괜찮나요?
-
-**네.** `forge setup`은 먼저 뭐가 바뀌는지 보여주고, 확인을 받은 후 적용합니다.
-
-```bash
-$ forge setup
-
+```
 === Forge Setup ===
 
-다음 항목이 설치/변경됩니다:
-
 Hooks & Settings:
-  + ~/.forge/hooks/resume.sh
   + hooks.SessionStart: resume.sh
-  = hooks.PostToolUse: detect.sh (already set)        ← 기존 값 유지
-  ! env.AGENT_TEAMS = 0 (Forge recommends: 1)         ← 다르면 경고
+  + hooks.SessionEnd: writeback.sh
+  = env.AGENT_TEAMS = 1 (ok)              ← existing value preserved
+  ! env.SOME_KEY = X (Forge recommends: Y) ← conflict shown, not overwritten
 
 Skills:
   + ~/.claude/skills/spawn-team/
   + ~/.claude/skills/doctor/
 
-DB: ~/.forge/forge.db (create if missing)
-
-설치하시겠습니까? [Y/n]:
+Proceed? [Y/n]:
 ```
 
-- `+` 새로 추가 / `=` 이미 정상 / `!` 기존값과 다름 (경고만, 덮어쓰지 않음)
-- 변경 전 `settings.json.bak` 자동 백업
-- `forge setup -y`로 확인 없이 바로 설치 (CI/자동화용)
+- `+` added / `=` already set / `!` differs from recommended (warning only)
+- `settings.json.bak` backup created before any change
+- `forge setup -y` to skip confirmation
 
-## 어떻게 동작하나?
+## What gets installed
 
-```
-[자동] 세션 시작
-  forge resume → DB에서 Q값 높은 실패 패턴 로드 → Claude에게 주입
-  "이전에 async connection을 닫지 않아서 3번 실패했어. Q: 0.8"
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Experience DB | `~/.forge/forge.db` | SQLite. Failures, decisions, rules, experiments |
+| Learning hooks | `~/.forge/hooks/*.sh` | Session start/end/failure detection |
+| Team skills | `~/.claude/skills/` | spawn-team, doctor, debate, ralph |
+| Model router | `~/.forge/hooks/teammate.sh` | Per-agent model selection |
+| Settings patch | `~/.claude/settings.json` | Hooks + env (append-only merge) |
 
-[자동] 코딩 중 Bash 실패
-  forge detect → stderr를 DB 패턴과 매칭 → 즉시 경고
-  "이 에러 전에도 봤어: 'Use async with for session scope'"
+## Q-value learning
 
-[자동] 세션 종료
-  forge writeback → transcript 파싱 → Q값 업데이트 → 실험 기록
-  - 경고가 도움됐으면 Q 올라감 (다음에 더 높은 우선순위)
-  - 도움 안 됐으면 Q 내려감 (점점 사라짐)
-```
-
-## Q값 학습 — 어떻게 "유용한 경험"을 판단하나?
+Based on [MemRL](https://arxiv.org/html/2601.03192v2) EMA with convergence guarantee:
 
 ```
-Q ← Q + 0.1 × (reward - Q)
+Q ← Q + α(r - Q)     α = 0.1
 
-reward = 1.0 → 경고했더니 실패 안 남 (도움됨)
-reward = 0.0 → 경고했는데 또 실패함 (도움 안 됨)
+r = 1.0  →  Warning helped (failure avoided next time)
+r = 0.0  →  Warning ignored (same error repeated)
 
-시간이 지나면 자동 감쇠: Q *= (1 - 0.005)^days
+Time decay: Q *= (1 - 0.005)^days_since_last_used
 ```
 
-| 초기 Q | 의미 |
-|--------|------|
-| 0.6 | near_miss — 거의 맞출 뻔한 실수 |
-| 0.5 | preventable — 예방 가능한 실수 |
-| 0.3 | environmental — 환경 문제 |
+High-Q experiences get injected first. Low-Q ones fade away. The system self-corrects.
 
-**Q가 높은 경험일수록 다음 세션에서 먼저 주입됩니다.**
+| Initial Q | Hint quality | Meaning |
+|-----------|-------------|---------|
+| 0.6 | near_miss | Almost got it right |
+| 0.5 | preventable | Could have been avoided |
+| 0.3 | environmental | External/env issue |
 
-## 수동으로도 기록할 수 있나요?
+## Experiment tracking
+
+Every session records a config hash, document hash, and unified fitness score:
 
 ```bash
-# 실패 기록
-forge record failure -p "async_leak" -h "async with로 세션 닫기" -q near_miss
-
-# 결정 기록
-forge record decision --statement "FastAPI 사용" --rationale "async + 자동 docs"
-
-# 규칙 기록
-forge record rule --text "커밋 전 테스트 실행" --mode warn
-
-# 조회
-forge list --type failure --sort q     # Q값 순 정렬
-forge detail async_leak                # 상세 보기
-forge stats                            # 통계
-```
-
-## 팀 개발 (Agent Teams)
-
-여러 에이전트를 동시에 돌릴 때도 경험을 공유합니다.
-
-```bash
-# 팀 구성 추천 (과거 성공률 기반)
-forge recommend --complexity MEDIUM
-# → sonnet:2+haiku:1 (3 runs, success: 85%, confidence: medium)
-
-# 팀 경험 주입
-forge resume --team-brief
-# → 최근 3회 런 결과 + 팀 관련 실패 패턴
-```
-
-`/spawn-team` 스킬이 자동으로 `forge recommend`와 `forge resume`을 호출합니다.
-
-## 최적화 — 설정을 자동으로 튜닝
-
-```bash
-# 현재 메트릭 측정
 forge measure
 #   QWHR: 0.72 | Promotion precision: 0.60 | Unified fitness: 0.6845
 
-# fitness 추이 확인
 forge trend -n 20
+#   Time             | Fitness | Config   | Type
+#   2026-03-17 15:42 | 0.6845  | a2f4c1   | auto
+#   2026-03-17 14:30 | 0.6614  | a2f4c1   | manual
 
-# 자동 최적화 (config 파라미터 탐색)
-forge research --max-rounds 50
-
-# 문서(CLAUDE.md) 분석까지 포함
-forge research --include-docs
+forge research --max-rounds 50    # auto-optimize config parameters
 ```
 
-## 전체 명령어
-
-| 명령 | 설명 |
-|------|------|
-| **설정** | |
-| `forge setup` | 전체 설정 (DB + hooks + skills) |
-| `forge setup --dry-run` | 변경 미리보기 |
-| **기록** | |
-| `forge record failure` | 실패 패턴 기록 |
-| `forge record decision` | 결정 기록 |
-| `forge record rule` | 규칙 기록 |
-| `forge record knowledge` | 지식 기록 |
-| **조회** | |
-| `forge list` | 목록 조회 |
-| `forge detail` | 상세 조회 |
-| `forge search -t TAG` | 태그 검색 |
-| `forge stats` | 통계 |
-| **분석** | |
-| `forge measure` | 최적화 메트릭 |
-| `forge trend` | fitness 추이 |
-| `forge optimize` | config 자동 최적화 |
-| `forge research` | 확장 AutoResearch |
-| **팀** | |
-| `forge recommend` | 팀 구성 추천 |
-| `forge ingest` | 팀 런 데이터 수집 |
-| **관리** | |
-| `forge decay` | 시간 감쇠 적용 |
-| `forge promote ID` | 전역/지식 승격 |
-| `forge dedup` | 중복 패턴 병합 |
-
-## 수치
-
-| 항목 | 값 |
-|------|-----|
-| 테스트 | 846개 (전체 통과) |
-| 소스 모듈 | 32개 |
-| 테스트 파일 | 32개 |
-| 코드 라인 | ~10,700줄 |
-| DB 스키마 | v4 (experiments + unified fitness) |
-| 외부 의존성 | 2개 (typer, pyyaml) |
-| Python | 3.12+ |
-
-## 설정 파일
-
-`~/.forge/config.yml` (전부 선택사항, 기본값 있음):
-
-```yaml
-# 컨텍스트 주입
-l0_max_entries: 50          # 세션 시작 시 주입할 최대 패턴 수
-forge_context_tokens: 2500  # 컨텍스트 토큰 예산
-
-# 학습
-alpha: 0.1                  # EMA 학습률
-decay_daily: 0.005          # 일일 감쇠율
-
-# 팀 라우팅
-routing_n_parallel_min: 3   # 팀 스폰 최소 병렬 작업 수
-routing_n_files_min: 5      # 팀 스폰 최소 파일 수
-max_agents: 5               # 에이전트 상한
-```
-
-## 기술 스택
-
-- **Python 3.12+** — 런타임
-- **SQLite** — 내장 DB (외부 서버 불필요)
-- **Typer** — CLI 프레임워크
-- **PyYAML** — 설정 파일 파싱
-
-## 문서
-
-- [Architecture v0.2](docs/architecture/ARCHITECTURE_v0.2.md)
-- [Migration Log](docs/MIGRATION_LOG.md) — summary.yml 제거 기록
-
----
-
-## English
-
-**A tool that makes coding agents learn from their mistakes.**
-
-Forge automatically remembers failures, decisions, and rules across Claude Code sessions. It injects relevant experience at session start and warns you when repeating known mistakes.
-
-### Install
+## Team orchestration
 
 ```bash
-pip install git+https://github.com/gksl5355/Project-Forge.git
-forge setup              # sets up everything
-forge setup --dry-run    # preview changes first
+forge recommend --complexity MEDIUM
+# → sonnet:2+haiku:1 (3 runs, success: 85%, confidence: medium)
+
+forge resume --team-brief
+# → Recent team runs + team-related failure patterns
 ```
 
-### How it works
+The bundled `/spawn-team` skill calls these automatically.
 
-1. **Session start**: Forge loads high-Q failure patterns and injects them into context
-2. **During coding**: Real-time Bash failure detection warns against known patterns
-3. **Session end**: Transcript parsed, Q-values updated, experiment recorded
-4. **Team runs**: `forge recommend` suggests best team config from history
+## Commands
 
-### Coexistence
+| Command | Description |
+|---------|-------------|
+| `forge setup` | Full setup (DB + hooks + skills). Shows changes, asks before applying |
+| `forge record failure` | Record a failure pattern with hint and quality |
+| `forge record decision` | Record a decision with rationale |
+| `forge record rule` | Record a project rule (block/warn/log) |
+| `forge list` | List experiences by type |
+| `forge detail PATTERN` | Detailed view of a failure pattern |
+| `forge search -t TAG` | Search by tag |
+| `forge stats` | Workspace statistics |
+| `forge measure` | Compute optimization metrics + unified fitness |
+| `forge trend` | Fitness trend over time |
+| `forge optimize` | Greedy sweep over config parameters |
+| `forge research` | Extended AutoResearch with experiment recording |
+| `forge recommend` | Team config recommendation from history |
+| `forge decay` | Apply time decay to stale patterns |
+| `forge promote ID` | Promote failure to global or knowledge |
+| `forge ingest` | Ingest team orchestration run data |
+| `forge dedup` | Merge duplicate patterns |
 
-`forge setup` uses **append-only merge** for `settings.json`. Your existing hooks, env vars, and plugins are preserved. Forge only adds its own entries. A `.bak` backup is created before any change.
+## Configuration
+
+`~/.forge/config.yml` — all optional, sensible defaults:
+
+```yaml
+# Context injection
+l0_max_entries: 50
+forge_context_tokens: 2500
+
+# Learning
+alpha: 0.1
+decay_daily: 0.005
+
+# Team routing
+routing_n_parallel_min: 3
+routing_n_files_min: 5
+max_agents: 5
+```
+
+## Metrics
+
+| Metric | Value |
+|--------|-------|
+| Tests | 846 (all passing) |
+| Source modules | 32 |
+| Test files | 32 |
+| Lines of code | ~10,700 |
+| DB schema version | v4 |
+| External dependencies | 2 (typer, pyyaml) |
+| Python | 3.12+ |
+
+## Tech stack
+
+- **Python 3.12+** — runtime
+- **SQLite** — built-in DB, no external server
+- **Typer** — CLI framework (argument parsing, help generation)
+- **PyYAML** — config file parsing
+
+## Acknowledgements
+
+Forge's design is influenced by:
+
+- **[MemRL](https://arxiv.org/html/2601.03192v2)** — EMA-based Q-value update with convergence guarantee. The core insight: Q measures "hint usefulness", not "failure severity"
+- **[OpenViking](https://github.com/nicepkg/OpenViking) (ByteDance)** — L0/L1/L2 layered context loading for token-efficient experience injection
+- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** — Hook system (SessionStart/SessionEnd/PostToolUse) that makes automatic learning possible
+
+## License
+
+MIT
