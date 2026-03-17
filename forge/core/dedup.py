@@ -36,8 +36,12 @@ def find_duplicates(
         return duplicates
 
     # Compute pairwise cosine similarity
-    from sklearn.metrics.pairwise import cosine_similarity
-    import numpy as np
+    try:
+        from sklearn.metrics.pairwise import cosine_similarity
+        import numpy as np
+    except ImportError:
+        logger.warning("sklearn/numpy not available; dedup requires vector dependencies")
+        return duplicates
 
     failure_ids = list(embeddings_map.keys())
     embedding_vectors = np.array([embeddings_map[fid] for fid in failure_ids])
@@ -51,7 +55,7 @@ def find_duplicates(
         for j in range(i + 1, len(failure_ids)):
             fid2 = failure_ids[j]
             sim = float(similarity_matrix[i, j])
-            if sim > threshold:
+            if sim >= threshold:
                 f1, f2 = failures_by_id[fid1], failures_by_id[fid2]
                 duplicates.append((f1, f2, sim))
 

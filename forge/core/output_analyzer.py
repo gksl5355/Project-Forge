@@ -14,6 +14,15 @@ from pathlib import Path
 
 logger = logging.getLogger("forge")
 
+# Pre-compiled regex patterns for pytest output analysis
+_PYTEST_SUMMARY_PATTERNS = [
+    re.compile(r".*passed.*", re.IGNORECASE),
+    re.compile(r".*failed.*", re.IGNORECASE),
+    re.compile(r".*error.*", re.IGNORECASE),
+    re.compile(r".*skipped.*", re.IGNORECASE),
+    re.compile(r"=+ .* in [\d.]+s =+"),
+]
+
 
 @dataclass
 class OutputPattern:
@@ -238,16 +247,9 @@ def _estimate_useful_portion(output: str, command: str) -> int:
 
     # pytest output: extract summary lines
     if "pytest" in command_lower:
-        summary_patterns = [
-            r".*passed.*",
-            r".*failed.*",
-            r".*error.*",
-            r".*skipped.*",
-            r"=+ .* in [\d.]+s =+",
-        ]
         useful_lines = []
         for line in output.split("\n"):
-            if any(re.search(pattern, line, re.IGNORECASE) for pattern in summary_patterns):
+            if any(p.search(line) for p in _PYTEST_SUMMARY_PATTERNS):
                 useful_lines.append(line)
 
         if useful_lines:

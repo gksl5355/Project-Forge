@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+
+logger = logging.getLogger("forge")
 
 
 @dataclass
@@ -58,8 +61,59 @@ def load_config(path: Path | None = None) -> ForgeConfig:
     config_path = path or _DEFAULT_CONFIG_PATH
     if not config_path.exists():
         return ForgeConfig()
-    with config_path.open("r", encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
+    try:
+        with config_path.open("r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except yaml.YAMLError as e:
+        logger.warning("Failed to parse config YAML at %s: %s", config_path, e)
+        return ForgeConfig()
     valid_fields = ForgeConfig.__dataclass_fields__.keys()
     filtered = {k: v for k, v in data.items() if k in valid_fields}
-    return ForgeConfig(**filtered)
+    config = ForgeConfig(**filtered)
+    return _validate_config(config)
+
+
+def _validate_config(config: ForgeConfig) -> ForgeConfig:
+    """Validate and clamp config values to valid ranges."""
+    # Clamp learning parameters to [0.0, 1.0]
+    config.alpha = max(0.0, min(1.0, config.alpha))
+    config.decay_daily = max(0.0, min(1.0, config.decay_daily))
+    config.q_min = max(0.0, min(1.0, config.q_min))
+    config.knowledge_promote_q = max(0.0, min(1.0, config.knowledge_promote_q))
+    config.lambda_weight = max(0.0, min(1.0, config.lambda_weight))
+    config.dedup_threshold = max(0.0, min(1.0, config.dedup_threshold))
+
+    # Clamp initial Q values to [0.0, 1.0]
+    config.initial_q_near_miss = max(0.0, min(1.0, config.initial_q_near_miss))
+    config.initial_q_preventable = max(0.0, min(1.0, config.initial_q_preventable))
+    config.initial_q_environmental = max(0.0, min(1.0, config.initial_q_environmental))
+    config.initial_q_decision = max(0.0, min(1.0, config.initial_q_decision))
+    config.initial_q_knowledge = max(0.0, min(1.0, config.initial_q_knowledge))
+
+    # Ensure positive integers
+    if config.max_tokens <= 0:
+        config.max_tokens = 3000
+    if config.l0_max_entries <= 0:
+        config.l0_max_entries = 50
+    if config.l1_project_entries <= 0:
+        config.l1_project_entries = 3
+    if config.l1_global_entries <= 0:
+        config.l1_global_entries = 2
+    if config.rules_max_entries <= 0:
+        config.rules_max_entries = 10
+    if config.promote_threshold <= 0:
+        config.promote_threshold = 2
+    if config.knowledge_promote_helped <= 0:
+        config.knowledge_promote_helped = 5
+    if config.total_max_tokens <= 0:
+        config.total_max_tokens = 4000
+    if config.team_context_tokens <= 0:
+        config.team_context_tokens = 1000
+    if config.forge_context_tokens <= 0:
+        config.forge_context_tokens = 2500
+    if config.debate_max_rounds <= 0:
+        config.debate_max_rounds = 2
+    if config.dedup_interval_days < 0:
+        config.dedup_interval_days = 0
+
+    return config

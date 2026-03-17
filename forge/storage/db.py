@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from pathlib import Path
+
+logger = logging.getLogger("forge")
 
 CURRENT_SCHEMA_VERSION = 3
 
@@ -167,21 +170,23 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
 def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
     """Apply incremental migrations."""
     if from_version < 2:
-        conn.execute(
-            "ALTER TABLE sessions ADD COLUMN failures_encountered INTEGER DEFAULT 0"
-        )
-        conn.execute(
-            "ALTER TABLE sessions ADD COLUMN q_updates_count INTEGER DEFAULT 0"
-        )
-        conn.execute(
-            "ALTER TABLE sessions ADD COLUMN promotions_count INTEGER DEFAULT 0"
-        )
+        for col in ("failures_encountered", "q_updates_count", "promotions_count"):
+            try:
+                conn.execute(
+                    f"ALTER TABLE sessions ADD COLUMN {col} INTEGER DEFAULT 0"
+                )
+            except sqlite3.OperationalError:
+                pass  # column already exists
 
     if from_version < 3:
         # v2 → v3: active column on failures, team_runs table
-        conn.execute(
-            "ALTER TABLE failures ADD COLUMN active INTEGER DEFAULT 1"
-        )
+        try:
+            conn.execute(
+                "ALTER TABLE failures ADD COLUMN active INTEGER DEFAULT 1"
+            )
+        except sqlite3.OperationalError:
+            pass  # column already exists
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS team_runs (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -210,8 +215,7 @@ def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
                 )
             """)
         except sqlite3.OperationalError:
-            # sqlite-vec extension not available — skip vector table
-            pass
+            logger.info("sqlite-vec not available; vector search disabled")
 
     conn.execute(
         "UPDATE schema_version SET version = ?", (CURRENT_SCHEMA_VERSION,)

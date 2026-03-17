@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from datetime import datetime, UTC
 from pathlib import Path
@@ -17,7 +18,7 @@ from forge.core.promote import (
 )
 from forge.core.qvalue import ema_update, initial_q, time_decay
 from forge.engines.transcript import parse_transcript
-from forge.storage.models import Decision, Failure
+from forge.storage.models import Decision, Failure, Knowledge
 from forge.storage.queries import (
     get_failure_by_pattern,
     get_session,
@@ -28,6 +29,8 @@ from forge.storage.queries import (
     update_failure,
     update_session_metrics,
 )
+
+logger = logging.getLogger("forge")
 
 
 class _NoCommitProxy:
@@ -173,13 +176,13 @@ def _do_writeback(
             if not existing_global:
                 global_copy = promote_to_global(failure)
                 insert_failure(db, global_copy)
-                print(f"[forge] Global promoted: '{failure.pattern}' (Q: {failure.q:.2f})")
+                logger.info("Global promoted: '%s' (Q: %.2f)", failure.pattern, failure.q)
                 p_promotions += 1
 
         if check_knowledge_promote(failure, config):
             knowledge = promote_to_knowledge(failure)
             insert_knowledge(db, knowledge)
-            print(f"[forge] Knowledge candidate: '{failure.pattern}' → '{knowledge.title}' (Q: {failure.q:.2f})")
+            logger.info("Knowledge candidate: '%s' → '%s' (Q: %.2f)", failure.pattern, knowledge.title, failure.q)
             p_promotions += 1
 
     # 4.5 LLM extraction (optional)
@@ -198,7 +201,7 @@ def _do_writeback(
     # 5. 세션 종료 기록 (impact metrics 포함)
     update_session_metrics(db, session_id, n_failures, m_q_updates, p_promotions)
 
-    print(f"[forge] Writeback: {n_failures} failures processed, {m_q_updates} Q-updates, {p_promotions} promotions")
+    logger.info("Writeback: %d failures processed, %d Q-updates, %d promotions", n_failures, m_q_updates, p_promotions)
 
 
 def _llm_extract_step(
@@ -231,7 +234,7 @@ def _llm_extract_step(
                 last_used=datetime.now(UTC),
             )
             insert_failure(db, failure)
-            print(f"[forge] LLM extracted failure: {item['pattern']}")
+            logger.info("LLM extracted failure: %s", item['pattern'])
 
         elif item["type"] == "decision":
             decision = Decision(
@@ -242,9 +245,9 @@ def _llm_extract_step(
                 q=config.initial_q_decision,
             )
             insert_decision(db, decision)
-            print(f"[forge] LLM extracted decision: {item['statement'][:60]}")
+            logger.info("LLM extracted decision: %s", item['statement'][:60])
 
-    print(f"[forge] LLM extraction: {len(extracted)} items extracted")
+    logger.info("LLM extraction: %d items extracted", len(extracted))
 
 
 def _output_analysis_step(
@@ -265,8 +268,6 @@ def _output_analysis_step(
 
     hints = generate_output_hints(patterns)
     for hint in hints:
-        from forge.storage.queries import insert_knowledge
-        from forge.storage.models import Knowledge
         # Check if similar knowledge already exists
         existing = db.execute(
             "SELECT id FROM knowledge WHERE workspace_id = ? AND title = ?",
@@ -283,7 +284,7 @@ def _output_analysis_step(
             tags=hint["tags"],
         )
         insert_knowledge(db, k)
-        print(f"[forge] Output pattern learned: {hint['title']}")
+        logger.info("Output pattern learned: %s", hint['title'])
 
 
 def _auto_dedup_step(
@@ -299,7 +300,6 @@ def _auto_dedup_step(
 
     last_dedup = get_meta(db, f"last_dedup_{workspace_id}")
     if last_dedup:
-        from datetime import datetime, UTC
         try:
             last_dt = datetime.fromisoformat(last_dedup)
             days = (datetime.now(UTC) - last_dt).total_seconds() / 86400.0
@@ -312,10 +312,10 @@ def _auto_dedup_step(
         from forge.core.dedup import run_dedup
         results = run_dedup(db, workspace_id, config, auto=True)
         if results:
-            print(f"[forge] Auto dedup: {len(results)} pair(s) merged")
+            logger.info("Auto dedup: %d pair(s) merged", len(results))
         set_meta(db, f"last_dedup_{workspace_id}", datetime.now(UTC).isoformat())
     except Exception as e:
-        print(f"[forge] Auto dedup skipped: {e}")
+        logger.warning("Auto dedup skipped: %s", e)
 
 
 def _auto_ingest_step(
@@ -336,6 +336,6 @@ def _auto_ingest_step(
         counts = run_ingest_auto(workspace_id, runs_dir, db, config)
         total = sum(counts.values())
         if total > 0:
-            print(f"[forge] Auto ingest: {counts['team_runs']} runs, {counts['failures']} failures, {counts['knowledge']} knowledge")
+            logger.info("Auto ingest: %d runs, %d failures, %d knowledge", counts['team_runs'], counts['failures'], counts['knowledge'])
     except Exception as e:
-        print(f"[forge] Auto ingest skipped: {e}")
+        logger.warning("Auto ingest skipped: %s", e)

@@ -6,7 +6,6 @@ import json
 import sqlite3
 import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -19,6 +18,7 @@ from forge.engines.writeback import run_writeback
 from forge.storage.db import get_connection, init_db
 from forge.storage.models import Decision, Failure, Knowledge, Rule
 from forge.storage.queries import (
+    _row_to_failure,
     get_decision_by_id,
     get_failure_by_id,
     get_failure_by_pattern,
@@ -65,11 +65,17 @@ def cmd_record_failure(
     quality: str = typer.Option("preventable", "--quality", "-q",
                                  help="near_miss | preventable | environmental"),
     workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
-    tag: Optional[list[str]] = typer.Option(None, "--tag", "-t", help="태그 (반복 가능)"),
-    observed: Optional[str] = typer.Option(None, "--observed", help="관찰된 에러 메시지"),
-    cause: Optional[str] = typer.Option(None, "--cause", help="예상 원인"),
+    tag: list[str] | None = typer.Option(None, "--tag", "-t", help="태그 (반복 가능)"),
+    observed: str | None = typer.Option(None, "--observed", help="관찰된 에러 메시지"),
+    cause: str | None = typer.Option(None, "--cause", help="예상 원인"),
 ):
     """실패 패턴 기록."""
+    if not pattern.strip():
+        typer.echo("Error: pattern cannot be empty", err=True)
+        raise typer.Exit(1)
+    if not hint.strip():
+        typer.echo("Error: hint cannot be empty", err=True)
+        raise typer.Exit(1)
     if len(pattern) > 200:
         typer.echo("Error: pattern must be 200 chars or less", err=True)
         raise typer.Exit(1)
@@ -111,11 +117,14 @@ def cmd_record_failure(
 def cmd_record_decision(
     statement: str = typer.Option(..., "--statement", "-s", help="결정 내용"),
     workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
-    rationale: Optional[str] = typer.Option(None, "--rationale", "-r", help="이유"),
-    tag: Optional[list[str]] = typer.Option(None, "--tag", "-t", help="태그 (반복 가능)"),
-    alternative: Optional[list[str]] = typer.Option(None, "--alternative", help="대안 (반복 가능)"),
+    rationale: str | None = typer.Option(None, "--rationale", "-r", help="이유"),
+    tag: list[str] | None = typer.Option(None, "--tag", "-t", help="태그 (반복 가능)"),
+    alternative: list[str] | None = typer.Option(None, "--alternative", help="대안 (반복 가능)"),
 ):
     """결정 기록."""
+    if not statement.strip():
+        typer.echo("Error: statement cannot be empty", err=True)
+        raise typer.Exit(1)
     db = get_connection()
     config = load_config()
     decision = Decision(
@@ -138,10 +147,13 @@ def cmd_record_decision(
 def cmd_record_rule(
     text: str = typer.Option(..., "--text", help="룰 텍스트"),
     workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
-    scope: Optional[str] = typer.Option(None, "--scope", help="적용 범위"),
+    scope: str | None = typer.Option(None, "--scope", help="적용 범위"),
     mode: str = typer.Option("warn", "--mode", "-m", help="block | warn | log"),
 ):
     """룰 기록."""
+    if not text.strip():
+        typer.echo("Error: rule text cannot be empty", err=True)
+        raise typer.Exit(1)
     valid_modes = {"block", "warn", "log"}
     if mode not in valid_modes:
         typer.echo(f"Error: mode must be one of {valid_modes}", err=True)
@@ -167,9 +179,15 @@ def cmd_record_knowledge(
     title: str = typer.Option(..., "--title", help="제목"),
     content: str = typer.Option(..., "--content", help="내용"),
     workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
-    tag: Optional[list[str]] = typer.Option(None, "--tag", "-t", help="태그 (반복 가능)"),
+    tag: list[str] | None = typer.Option(None, "--tag", "-t", help="태그 (반복 가능)"),
 ):
     """지식 기록."""
+    if not title.strip():
+        typer.echo("Error: title cannot be empty", err=True)
+        raise typer.Exit(1)
+    if not content.strip():
+        typer.echo("Error: content cannot be empty", err=True)
+        raise typer.Exit(1)
     db = get_connection()
     config = load_config()
     knowledge = Knowledge(
@@ -224,7 +242,8 @@ def cmd_list(
             sr = f"{tr.success_rate:.0%}" if tr.success_rate is not None else "N/A"
             typer.echo(f"[{tr.id}] {tr.run_id} | {tr.complexity or 'N/A'} | success:{sr} | {tr.verdict or ''}")
     else:
-        typer.echo(f"Error: unknown type '{type_}'", err=True)
+        valid = "failure, decision, rule, knowledge, team_run"
+        typer.echo(f"Error: unknown type '{type_}'. Valid: {valid}", err=True)
         raise typer.Exit(1)
 
 
@@ -285,9 +304,9 @@ def cmd_detail(
 def cmd_edit(
     id_: int = typer.Argument(..., metavar="ID", help="편집할 항목 ID"),
     workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
-    hint: Optional[str] = typer.Option(None, "--hint", help="새 avoid_hint (failure용)"),
-    rationale: Optional[str] = typer.Option(None, "--rationale", help="새 rationale (decision용)"),
-    status: Optional[str] = typer.Option(
+    hint: str | None = typer.Option(None, "--hint", help="새 avoid_hint (failure용)"),
+    rationale: str | None = typer.Option(None, "--rationale", help="새 rationale (decision용)"),
+    status: str | None = typer.Option(
         None, "--status", help="새 status (decision용): active | superseded | revisiting"
     ),
 ):
@@ -353,28 +372,16 @@ def cmd_promote(
 ):
     """Failure를 전역 또는 knowledge로 승격."""
     db = get_connection()
-    row = db.execute("SELECT * FROM failures WHERE id = ?", (id_,)).fetchone()
-    if not row:
-        typer.echo(f"Failure {id_} not found.", err=True)
-        raise typer.Exit(1)
-
-    failure = Failure(
-        id=row["id"],
-        workspace_id=row["workspace_id"],
-        pattern=row["pattern"],
-        avoid_hint=row["avoid_hint"],
-        hint_quality=row["hint_quality"],
-        q=row["q"],
-        times_seen=row["times_seen"],
-        times_helped=row["times_helped"],
-        times_warned=row["times_warned"],
-        tags=json.loads(row["tags"] or "[]"),
-        projects_seen=json.loads(row["projects_seen"] or "[]"),
-        source=row["source"],
-        review_flag=bool(row["review_flag"]),
-        observed_error=row["observed_error"],
-        likely_cause=row["likely_cause"],
-    )
+    failure = get_failure_by_id(db, id_, workspace)
+    if not failure:
+        failure = get_failure_by_id(db, id_, "__global__")
+    if not failure:
+        # Fallback: try without workspace filter
+        row = db.execute("SELECT * FROM failures WHERE id = ?", (id_,)).fetchone()
+        if not row:
+            typer.echo(f"Failure {id_} not found.", err=True)
+            raise typer.Exit(1)
+        failure = _row_to_failure(row)
 
     if to_knowledge:
         knowledge = promote_to_knowledge(failure)
@@ -550,7 +557,7 @@ def cmd_install_hooks():
 @app.command("ingest")
 def cmd_ingest(
     workspace: str = typer.Option(..., "--workspace", "-w", help="워크스페이스 ID"),
-    run_dir: Optional[str] = typer.Option(None, "--run-dir", help=".claude/runs/<RUN_ID>/ 경로"),
+    run_dir: str | None = typer.Option(None, "--run-dir", help=".claude/runs/<RUN_ID>/ 경로"),
     auto: bool = typer.Option(False, "--auto", help=".claude/runs/ 아래 자동 감지"),
 ):
     """TO 런 데이터를 forge.db로 수집."""
@@ -560,7 +567,7 @@ def cmd_ingest(
     config = load_config()
 
     if auto:
-        runs_base = Path(workspace) / ".claude" / "runs"
+        runs_base = Path.cwd() / ".claude" / "runs"
         counts = run_ingest_auto(workspace, runs_base, db, config)
     elif run_dir:
         counts = run_ingest(workspace, Path(run_dir), db, config)

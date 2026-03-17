@@ -22,6 +22,7 @@ def _parse_dt(value: str | None) -> datetime | None:
     try:
         return datetime.fromisoformat(value)
     except ValueError:
+        logger.warning("Failed to parse datetime: %s", value[:50] if value else "")
         return None
 
 
@@ -350,6 +351,16 @@ def insert_rule(db: sqlite3.Connection, rule: Rule) -> int:
     return cur.lastrowid
 
 
+def get_rule_by_id(
+    db: sqlite3.Connection, rule_id: int, workspace_id: str
+) -> Rule | None:
+    row = db.execute(
+        "SELECT * FROM rules WHERE id = ? AND workspace_id = ?",
+        (rule_id, workspace_id),
+    ).fetchone()
+    return _row_to_rule(row) if row else None
+
+
 def list_rules(db: sqlite3.Connection, workspace_id: str) -> list[Rule]:
     rows = db.execute(
         "SELECT * FROM rules WHERE workspace_id = ? AND active = 1 ORDER BY id",
@@ -433,6 +444,35 @@ def list_knowledge(
             (workspace_id,),
         ).fetchall()
     return [_row_to_knowledge(r) for r in rows]
+
+
+def get_knowledge_by_id(
+    db: sqlite3.Connection, knowledge_id: int, workspace_id: str
+) -> Knowledge | None:
+    row = db.execute(
+        "SELECT * FROM knowledge WHERE id = ? AND workspace_id = ?",
+        (knowledge_id, workspace_id),
+    ).fetchone()
+    return _row_to_knowledge(row) if row else None
+
+
+def update_knowledge(db: sqlite3.Connection, knowledge: Knowledge) -> None:
+    db.execute(
+        """
+        UPDATE knowledge SET
+            title = ?, content = ?, q = ?, tags = ?, last_used = ?
+        WHERE id = ?
+        """,
+        (
+            knowledge.title,
+            knowledge.content,
+            knowledge.q,
+            json.dumps(knowledge.tags),
+            _dt_str(knowledge.last_used),
+            knowledge.id,
+        ),
+    )
+    db.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -583,6 +623,26 @@ def list_team_runs(
         (workspace_id, limit),
     ).fetchall()
     return [_row_to_team_run(r) for r in rows]
+
+
+def update_team_run(db: sqlite3.Connection, team_run: TeamRun) -> None:
+    db.execute(
+        """
+        UPDATE team_runs SET
+            verdict = ?, success_rate = ?, retry_rate = ?,
+            scope_violations = ?, agents = ?
+        WHERE id = ?
+        """,
+        (
+            team_run.verdict,
+            team_run.success_rate,
+            team_run.retry_rate,
+            team_run.scope_violations,
+            json.dumps(team_run.agents),
+            team_run.id,
+        ),
+    )
+    db.commit()
 
 
 # ---------------------------------------------------------------------------

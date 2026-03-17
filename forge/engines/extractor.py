@@ -78,6 +78,9 @@ def llm_extract(
             max_tokens=4096,
             messages=[{"role": "user", "content": prompt}],
         )
+        if not response.content:
+            logger.warning("[forge] LLM extraction returned empty content")
+            return []
         result_text = response.content[0].text
     except Exception as e:
         logger.warning("[forge] LLM extraction API call failed: %s", e)
