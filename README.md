@@ -10,11 +10,11 @@ Forge accumulates failures, decisions, rules, and knowledge across coding sessio
 # Install
 uv pip install -e .   # or: pip install -e .
 
-# One-command setup (DB + hooks + team support)
+# One-command setup (DB + hooks + skills + team env)
 forge setup
 ```
 
-That's it. Forge will auto-learn from every Claude Code session.
+That's it. `forge setup` installs everything: database, hooks, team skills (spawn-team, doctor, debate, ralph), and Claude Code settings. No separate repo needed.
 
 ## What Forge Does
 
@@ -83,14 +83,19 @@ Time decay: Q *= (1 - 0.005)^days
 
 ```bash
 forge setup
-# [1/3] DB initialized.           → ~/.forge/forge.db
-# [2/3] Hooks + teammate.sh installed.
+# [1/4] DB initialized.           → ~/.forge/forge.db
+# [2/4] Hooks + teammate.sh installed.
 #   ~/.forge/hooks/resume.sh      → SessionStart hook
 #   ~/.forge/hooks/writeback.sh   → SessionEnd hook
 #   ~/.forge/hooks/detect.sh      → PostToolUse hook
 #   ~/.forge/hooks/teammate.sh    → Team model selector
 #   ~/.claude/settings.json       → Hooks + env patched
-# [3/3] Setup complete.
+# [3/4] 4 skill(s) installed.
+#   ~/.claude/skills/spawn-team/  → Team orchestration
+#   ~/.claude/skills/doctor/      → Environment check
+#   ~/.claude/skills/debate/      → Architecture review
+#   ~/.claude/skills/ralph/       → Persistence loop
+# [4/4] Setup complete.
 ```
 
 ## Configuration

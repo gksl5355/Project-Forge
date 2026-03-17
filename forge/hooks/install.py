@@ -8,7 +8,9 @@ from pathlib import Path
 
 _SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
 _HOOKS_DIR = Path.home() / ".forge" / "hooks"
+_SKILLS_DIR = Path.home() / ".claude" / "skills"
 _HOOK_TEMPLATES = Path(__file__).parent / "templates"
+_SKILL_SOURCES = Path(__file__).parent.parent / "skills"
 
 
 def install_hooks() -> None:
@@ -81,6 +83,24 @@ def install_hooks() -> None:
     except OSError as e:
         print(f"[forge] Warning: Failed to write settings.json: {e}")
         raise
+
+
+def install_skills() -> int:
+    """Install bundled SKILL.md files to ~/.claude/skills/."""
+    if not _SKILL_SOURCES.is_dir():
+        return 0
+    installed = 0
+    for skill_dir in _SKILL_SOURCES.iterdir():
+        if not skill_dir.is_dir():
+            continue
+        skill_file = skill_dir / "SKILL.md"
+        if not skill_file.exists():
+            continue
+        dst_dir = _SKILLS_DIR / skill_dir.name
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(skill_file, dst_dir / "SKILL.md")
+        installed += 1
+    return installed
 
 
 def _entry_exists(hook_list: list, command: str) -> bool:

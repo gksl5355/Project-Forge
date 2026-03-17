@@ -556,27 +556,32 @@ def cmd_install_hooks():
 
 @app.command("setup")
 def cmd_setup():
-    """Forge 전체 설정 (DB 초기화 + hooks 설치 + 팀 환경 구성)."""
-    from forge.hooks.install import install_hooks
+    """Forge 전체 설정 (DB + hooks + skills + 팀 환경)."""
+    from forge.hooks.install import install_hooks, install_skills
 
     # 1. Init DB
     init_db()
-    typer.echo("[1/3] DB initialized.")
+    typer.echo("[1/4] DB initialized.")
 
     # 2. Install hooks + teammate + env
     install_hooks()
-    typer.echo("[2/3] Hooks + teammate.sh installed.")
+    typer.echo("[2/4] Hooks + teammate.sh installed.")
 
-    # 3. Summary
-    typer.echo("[3/3] Setup complete.")
+    # 3. Install skills
+    n_skills = install_skills()
+    typer.echo(f"[3/4] {n_skills} skill(s) installed.")
+
+    # 4. Summary
+    typer.echo("[4/4] Setup complete.")
     typer.echo("")
     typer.echo("Installed:")
-    typer.echo("  ~/.forge/forge.db          (experience database)")
-    typer.echo("  ~/.forge/hooks/resume.sh   (SessionStart hook)")
-    typer.echo("  ~/.forge/hooks/writeback.sh (SessionEnd hook)")
-    typer.echo("  ~/.forge/hooks/detect.sh   (PostToolUse hook)")
-    typer.echo("  ~/.forge/hooks/teammate.sh (team model selector)")
-    typer.echo("  ~/.claude/settings.json    (hooks + env patched)")
+    typer.echo("  ~/.forge/forge.db              (experience database)")
+    typer.echo("  ~/.forge/hooks/*.sh            (4 hook scripts)")
+    typer.echo("  ~/.claude/skills/spawn-team/   (team orchestration)")
+    typer.echo("  ~/.claude/skills/doctor/       (environment check)")
+    typer.echo("  ~/.claude/skills/debate/       (architecture review)")
+    typer.echo("  ~/.claude/skills/ralph/        (persistence loop)")
+    typer.echo("  ~/.claude/settings.json        (hooks + env patched)")
     typer.echo("")
     typer.echo("Next: Start a Claude Code session. Forge will auto-learn.")
 
