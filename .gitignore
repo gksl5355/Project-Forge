@@ -5,3 +5,4 @@ dist/
 build/
 .pytest_cache/
 .forge/
+.claude/settings.local.json

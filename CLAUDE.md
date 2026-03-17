@@ -14,10 +14,11 @@ An experience learning CLI tool for coding agents. Accumulates failures, decisio
 forge/
 ├── cli.py              # Typer app, all commands registered here
 ├── config.py            # ForgeConfig dataclass + YAML loading + defaults
-├── engines/             # resume, writeback, detect, transcript
-├── core/                # qvalue, matcher, promote, context
+├── engines/             # resume, writeback, detect, transcript, fitness, optimizer, measure
+├── core/                # qvalue, matcher, promote, context, hashing, directive
 ├── storage/             # db, models, queries (raw sqlite3)
-└── hooks/               # install, templates/
+├── hooks/               # install, templates/ (resume/writeback/detect/teammate.sh)
+└── skills/              # bundled SKILL.md files (spawn-team, doctor, debate, ralph)
 ```
 
 ## Core Concepts
@@ -42,10 +43,9 @@ forge/
 
 ## Key Documents
 
-- Idea Notes: `docs/IDEA_NOTES.md`
-- PRD: `docs/prd/PRD_v0.2.md`
 - Architecture: `docs/architecture/ARCHITECTURE_v0.2.md`
 - TRD: `docs/trd/TRD_v0.2.md`
+- Migration Log: `docs/MIGRATION_LOG.md`
 
 ## Forge + TO Integration
 
