@@ -41,10 +41,6 @@ forge/
 - All CLI commands use Typer
 - Tests use pytest with in-memory SQLite fixture (see tests/conftest.py)
 
-## Key Documents
-
-- Migration Log: `docs/MIGRATION_LOG.md`
-
 ## Forge + TO Integration
 
 Forge is the **single source of truth** for all team orchestration learning.
