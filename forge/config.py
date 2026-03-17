@@ -41,6 +41,13 @@ class ForgeConfig:
     # v1: LLM extraction
     llm_extract_enabled: bool = False
     llm_model: str = "claude-haiku-4-5-20251001"
+    # v2: debate
+    codex_model: str = "gpt-5.4"
+    debate_max_rounds: int = 2
+    # v2: dedup interval
+    dedup_interval_days: int = 0      # 0=disabled, >0=auto dedup after N days
+    # v2: auto ingest
+    auto_ingest_enabled: bool = True
 
 
 _DEFAULT_CONFIG_PATH = Path.home() / ".forge" / "config.yml"

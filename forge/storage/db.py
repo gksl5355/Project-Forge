@@ -106,6 +106,12 @@ CREATE INDEX idx_decisions_ws_status ON decisions(workspace_id, status);
 CREATE INDEX idx_knowledge_ws_q ON knowledge(workspace_id, q DESC);
 CREATE INDEX idx_rules_ws_active ON rules(workspace_id, active);
 CREATE INDEX idx_team_runs_ws ON team_runs(workspace_id);
+
+CREATE TABLE IF NOT EXISTS forge_meta (
+    key        TEXT PRIMARY KEY,
+    value      TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 _DEFAULT_DB_PATH = Path.home() / ".forge" / "forge.db"
@@ -142,6 +148,16 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         conn.executescript(_SCHEMA_SQL)
         conn.commit()
         return
+
+    # Ensure forge_meta exists (added in v2, safe to create always)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS forge_meta (
+            key        TEXT PRIMARY KEY,
+            value      TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
 
     version = conn.execute("SELECT version FROM schema_version").fetchone()[0]
     if version < CURRENT_SCHEMA_VERSION:

@@ -186,6 +186,15 @@ def _do_writeback(
     if llm_extract and config.llm_extract_enabled:
         _llm_extract_step(workspace_id, transcript_path, db, config)
 
+    # 4.6 Output analysis — scriptable pattern learning (v2)
+    _output_analysis_step(workspace_id, transcript_path, db, config)
+
+    # 4.7 Auto dedup (v2) — if interval configured and elapsed
+    _auto_dedup_step(workspace_id, db, config)
+
+    # 4.8 Auto ingest (v2) — collect TO run data if available
+    _auto_ingest_step(workspace_id, db, config)
+
     # 5. 세션 종료 기록 (impact metrics 포함)
     update_session_metrics(db, session_id, n_failures, m_q_updates, p_promotions)
 
@@ -236,3 +245,97 @@ def _llm_extract_step(
             print(f"[forge] LLM extracted decision: {item['statement'][:60]}")
 
     print(f"[forge] LLM extraction: {len(extracted)} items extracted")
+
+
+def _output_analysis_step(
+    workspace_id: str,
+    transcript_path: Path,
+    db: Any,
+    config: ForgeConfig,
+) -> None:
+    """Analyze tool outputs for scriptable patterns (v2)."""
+    try:
+        from forge.core.output_analyzer import analyze_transcript_outputs, generate_output_hints
+    except ImportError:
+        return
+
+    patterns = analyze_transcript_outputs(transcript_path)
+    if not patterns:
+        return
+
+    hints = generate_output_hints(patterns)
+    for hint in hints:
+        from forge.storage.queries import insert_knowledge
+        from forge.storage.models import Knowledge
+        # Check if similar knowledge already exists
+        existing = db.execute(
+            "SELECT id FROM knowledge WHERE workspace_id = ? AND title = ?",
+            (workspace_id, hint["title"]),
+        ).fetchone()
+        if existing:
+            continue
+        k = Knowledge(
+            workspace_id=workspace_id,
+            title=hint["title"],
+            content=hint["content"],
+            source="organic",
+            q=config.initial_q_knowledge,
+            tags=hint["tags"],
+        )
+        insert_knowledge(db, k)
+        print(f"[forge] Output pattern learned: {hint['title']}")
+
+
+def _auto_dedup_step(
+    workspace_id: str,
+    db: Any,
+    config: ForgeConfig,
+) -> None:
+    """Auto dedup if interval elapsed (v2)."""
+    if config.dedup_interval_days <= 0:
+        return
+
+    from forge.storage.queries import get_meta, set_meta
+
+    last_dedup = get_meta(db, f"last_dedup_{workspace_id}")
+    if last_dedup:
+        from datetime import datetime, UTC
+        try:
+            last_dt = datetime.fromisoformat(last_dedup)
+            days = (datetime.now(UTC) - last_dt).total_seconds() / 86400.0
+            if days < config.dedup_interval_days:
+                return
+        except ValueError:
+            pass
+
+    try:
+        from forge.core.dedup import run_dedup
+        results = run_dedup(db, workspace_id, config, auto=True)
+        if results:
+            print(f"[forge] Auto dedup: {len(results)} pair(s) merged")
+        set_meta(db, f"last_dedup_{workspace_id}", datetime.now(UTC).isoformat())
+    except Exception as e:
+        print(f"[forge] Auto dedup skipped: {e}")
+
+
+def _auto_ingest_step(
+    workspace_id: str,
+    db: Any,
+    config: ForgeConfig,
+) -> None:
+    """Auto ingest TO run data if available (v2)."""
+    if not config.auto_ingest_enabled:
+        return
+
+    runs_dir = Path(workspace_id) / ".claude" / "runs"
+    if not runs_dir.exists():
+        return
+
+    try:
+        from forge.engines.ingest import run_ingest_auto
+        counts = run_ingest_auto(workspace_id, runs_dir, db, config)
+        total = sum(counts.values())
+        if total > 0:
+            print(f"[forge] Auto ingest: {counts['team_runs']} runs, {counts['failures']} failures, {counts['knowledge']} knowledge")
+    except Exception as e:
+        print(f"[forge] Auto ingest skipped: {e}")

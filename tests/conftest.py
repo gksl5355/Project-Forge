@@ -107,6 +107,12 @@ def db():
         CREATE INDEX idx_knowledge_ws_q ON knowledge(workspace_id, q DESC);
         CREATE INDEX idx_rules_ws_active ON rules(workspace_id, active);
         CREATE INDEX idx_team_runs_ws ON team_runs(workspace_id);
+
+        CREATE TABLE IF NOT EXISTS forge_meta (
+            key        TEXT PRIMARY KEY,
+            value      TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
     """)
 
     yield conn

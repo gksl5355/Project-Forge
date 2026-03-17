@@ -583,3 +583,29 @@ def list_team_runs(
         (workspace_id, limit),
     ).fetchall()
     return [_row_to_team_run(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Forge Meta (key-value store for system metadata)
+# ---------------------------------------------------------------------------
+
+def get_meta(db: sqlite3.Connection, key: str) -> str | None:
+    try:
+        row = db.execute(
+            "SELECT value FROM forge_meta WHERE key = ?", (key,)
+        ).fetchone()
+        return row[0] if row else None
+    except sqlite3.OperationalError:
+        return None
+
+
+def set_meta(db: sqlite3.Connection, key: str, value: str) -> None:
+    db.execute(
+        """
+        INSERT INTO forge_meta (key, value, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+        """,
+        (key, value, _dt_str(datetime.now(UTC))),
+    )
+    db.commit()
