@@ -42,20 +42,33 @@ forge setup
 
 ### 기존 설정이 있어도 괜찮나요?
 
-**네.** 기존 hooks나 환경변수를 덮어쓰지 않습니다.
-
-- hooks: Forge 것만 **추가** (기존 hooks 유지)
-- 환경변수: 없으면 추가, **이미 있는데 값이 다르면 경고 표시**
-- 변경 전 `settings.json.bak` 자동 백업
-- `forge setup --dry-run`으로 미리보기 가능
+**네.** `forge setup`은 먼저 뭐가 바뀌는지 보여주고, 확인을 받은 후 적용합니다.
 
 ```bash
-forge setup --dry-run
-#   + hooks.SessionStart: resume.sh
-#   = hooks.PostToolUse: detect.sh (already set)
-#   ! env.AGENT_TEAMS = 0 (Forge recommends: 1)    ← 기존 값 다르면 경고
-#   + ~/.claude/skills/spawn-team/
+$ forge setup
+
+=== Forge Setup ===
+
+다음 항목이 설치/변경됩니다:
+
+Hooks & Settings:
+  + ~/.forge/hooks/resume.sh
+  + hooks.SessionStart: resume.sh
+  = hooks.PostToolUse: detect.sh (already set)        ← 기존 값 유지
+  ! env.AGENT_TEAMS = 0 (Forge recommends: 1)         ← 다르면 경고
+
+Skills:
+  + ~/.claude/skills/spawn-team/
+  + ~/.claude/skills/doctor/
+
+DB: ~/.forge/forge.db (create if missing)
+
+설치하시겠습니까? [Y/n]:
 ```
+
+- `+` 새로 추가 / `=` 이미 정상 / `!` 기존값과 다름 (경고만, 덮어쓰지 않음)
+- 변경 전 `settings.json.bak` 자동 백업
+- `forge setup -y`로 확인 없이 바로 설치 (CI/자동화용)
 
 ## 어떻게 동작하나?
 

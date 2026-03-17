@@ -556,47 +556,55 @@ def cmd_install_hooks():
 
 @app.command("setup")
 def cmd_setup(
-    dry_run: bool = typer.Option(False, "--dry-run", help="변경 없이 미리보기만"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="확인 없이 바로 적용"),
 ):
     """Forge 전체 설정 (DB + hooks + skills + 팀 환경).
 
-    기존 설정과 충돌하지 않습니다:
-    - settings.json: 기존 hooks/env 유지, Forge 항목만 추가
-    - settings.json.bak: 변경 전 자동 백업
-    - skills: 번들 버전으로 업데이트 (기존 커스텀 설정은 유지)
+    변경 사항을 먼저 보여주고, 적용 여부를 물어봅니다.
+    --yes로 확인 없이 바로 적용할 수 있습니다.
     """
     from forge.hooks.install import install_hooks, install_skills
 
-    if dry_run:
-        typer.echo("=== Dry Run (no changes will be made) ===\n")
+    # 1. Preview: 뭐가 바뀌는지 먼저 보여주기
+    typer.echo("=== Forge Setup ===\n")
+    typer.echo("다음 항목이 설치/변경됩니다:\n")
 
-    # 1. Init DB
-    if not dry_run:
-        init_db()
-    typer.echo("[1/4] DB initialized." + (" (skip)" if dry_run else ""))
-
-    # 2. Install hooks + teammate + env
-    hook_changes = install_hooks(dry_run=dry_run)
-    typer.echo(f"[2/4] Hooks ({len(hook_changes)} changes):")
+    hook_changes = install_hooks(dry_run=True)
+    typer.echo("Hooks & Settings:")
     for c in hook_changes:
         typer.echo(c)
 
-    # 3. Install skills
-    skill_changes = install_skills(dry_run=dry_run)
-    typer.echo(f"[3/4] Skills ({len(skill_changes)} installed):")
+    skill_changes = install_skills(dry_run=True)
+    typer.echo("\nSkills:")
     for s in skill_changes:
         typer.echo(s)
 
-    # 4. Summary
-    if dry_run:
-        typer.echo("\n[4/4] Dry run complete. Run without --dry-run to apply.")
-    else:
-        typer.echo("\n[4/4] Setup complete.")
-        typer.echo("\nMerge strategy:")
-        typer.echo("  settings.json: append-only (existing hooks/env preserved)")
-        typer.echo("  settings.json.bak: backup created before changes")
-        typer.echo("  skills: updated to bundled version")
-        typer.echo("\nNext: Start a Claude Code session. Forge will auto-learn.")
+    typer.echo(f"\nDB: ~/.forge/forge.db (create if missing)")
+
+    # ! 경고가 있으면 강조
+    warnings = [c for c in hook_changes if c.strip().startswith("!")]
+    if warnings:
+        typer.echo("\n[!] 기존 설정과 다른 값이 있습니다:")
+        for w in warnings:
+            typer.echo(w)
+        typer.echo("    (Forge가 덮어쓰지 않습니다. 직접 변경하세요)")
+
+    # 2. 확인
+    if not yes:
+        typer.echo("")
+        proceed = typer.confirm("설치하시겠습니까?", default=True)
+        if not proceed:
+            typer.echo("취소됨.")
+            raise typer.Exit(0)
+
+    # 3. 적용
+    typer.echo("")
+    init_db()
+    install_hooks(dry_run=False)
+    install_skills(dry_run=False)
+
+    typer.echo("Setup complete.")
+    typer.echo("다음 Claude Code 세션부터 Forge가 자동으로 학습합니다.")
 
 
 # ---------------------------------------------------------------------------
