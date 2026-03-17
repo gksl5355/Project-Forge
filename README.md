@@ -7,11 +7,16 @@ Forge accumulates failures, decisions, rules, and knowledge across coding sessio
 ## Quick Start
 
 ```bash
-# Install
-uv pip install -e .   # or: pip install -e .
+# Install from GitHub
+pip install git+https://github.com/gksl5355/Project-Forge.git
+
+# Or clone + install
+git clone https://github.com/gksl5355/Project-Forge.git
+cd Project-Forge
+uv pip install -e .
 
 # One-command setup (DB + hooks + skills + team env)
-forge setup
+forge setup            # preview first: forge setup --dry-run
 ```
 
 That's it. `forge setup` installs everything: database, hooks, team skills (spawn-team, doctor, debate, ralph), and Claude Code settings. No separate repo needed.
@@ -82,21 +87,29 @@ Time decay: Q *= (1 - 0.005)^days
 ## How `forge setup` Works
 
 ```bash
-forge setup
-# [1/4] DB initialized.           → ~/.forge/forge.db
-# [2/4] Hooks + teammate.sh installed.
-#   ~/.forge/hooks/resume.sh      → SessionStart hook
-#   ~/.forge/hooks/writeback.sh   → SessionEnd hook
-#   ~/.forge/hooks/detect.sh      → PostToolUse hook
-#   ~/.forge/hooks/teammate.sh    → Team model selector
-#   ~/.claude/settings.json       → Hooks + env patched
-# [3/4] 4 skill(s) installed.
-#   ~/.claude/skills/spawn-team/  → Team orchestration
-#   ~/.claude/skills/doctor/      → Environment check
-#   ~/.claude/skills/debate/      → Architecture review
-#   ~/.claude/skills/ralph/       → Persistence loop
-# [4/4] Setup complete.
+forge setup --dry-run    # preview changes without applying
+forge setup              # apply
 ```
+
+### What gets installed
+
+| Target | Action | Conflict? |
+|--------|--------|-----------|
+| `~/.forge/forge.db` | Create if missing | No — append-only |
+| `~/.forge/hooks/*.sh` | Copy 4 scripts | Overwrite (Forge-managed) |
+| `~/.claude/skills/*/SKILL.md` | Copy 4 skills | Overwrite (Forge-managed) |
+| `~/.claude/settings.json` hooks | Append Forge hooks | **No** — existing hooks preserved |
+| `~/.claude/settings.json` env | Set defaults | **No** — existing env vars preserved |
+| `~/.claude/settings.json.bak` | Auto-backup | Created before any change |
+
+### Coexistence with other tools
+
+Forge uses **append-only merge** for `settings.json`:
+- Your existing hooks (oh-my-claudecode, custom scripts, etc.) are never removed
+- Forge only adds its own 3 hooks if not already present
+- `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` set only if not already defined
+- `TEAMMATE_COMMAND` updated only if not already pointing to Forge
+- Backup created at `settings.json.bak` before every change
 
 ## Configuration
 
@@ -139,9 +152,15 @@ Forge는 코딩 세션의 실패/결정/규칙/지식을 축적하고, MemRL EMA
 ## 설치
 
 ```bash
-uv pip install -e .
-forge setup    # DB + hooks + 팀 환경 한번에 설정
+# GitHub에서 바로 설치
+pip install git+https://github.com/gksl5355/Project-Forge.git
+
+# 한방 셋업 (DB + hooks + skills + 팀 환경)
+forge setup --dry-run    # 미리보기
+forge setup              # 적용
 ```
+
+기존 `settings.json`과 충돌하지 않습니다 (append-only merge, .bak 백업).
 
 ## 핵심 명령
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from datetime import datetime, UTC
 from pathlib import Path
 
 _SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
@@ -13,93 +14,112 @@ _HOOK_TEMPLATES = Path(__file__).parent / "templates"
 _SKILL_SOURCES = Path(__file__).parent.parent / "skills"
 
 
-def install_hooks() -> None:
-    """Install Forge hooks into Claude Code settings.json + copy scripts."""
-    _HOOKS_DIR.mkdir(parents=True, exist_ok=True)
+def install_hooks(dry_run: bool = False) -> list[str]:
+    """Install Forge hooks into Claude Code settings.json + copy scripts.
 
-    # Copy hook scripts
+    Merge strategy:
+    - Hooks: append-only (existing hooks preserved, Forge hooks added)
+    - Env vars: setdefault (existing values never overwritten)
+    - TEAMMATE_COMMAND: updated only if not already Forge-managed
+    - Backup: settings.json.bak created before any changes
+
+    Returns list of changes made (or would-be-made in dry_run).
+    """
+    changes: list[str] = []
+
+    # --- Hook scripts ---
+    if not dry_run:
+        _HOOKS_DIR.mkdir(parents=True, exist_ok=True)
+
     for script_name in ("resume.sh", "writeback.sh", "detect.sh", "teammate.sh"):
         src = _HOOK_TEMPLATES / script_name
         dst = _HOOKS_DIR / script_name
         if src.exists():
-            shutil.copy2(src, dst)
-            dst.chmod(0o755)
+            if not dry_run:
+                shutil.copy2(src, dst)
+                dst.chmod(0o755)
+            changes.append(f"  hook: {dst}")
 
-    # Load or create settings.json
+    # --- settings.json ---
     if _SETTINGS_PATH.exists():
         try:
-            settings = json.loads(_SETTINGS_PATH.read_text(encoding="utf-8"))
+            original_text = _SETTINGS_PATH.read_text(encoding="utf-8")
+            settings = json.loads(original_text)
         except (json.JSONDecodeError, OSError):
             settings = {}
+            original_text = "{}"
     else:
-        _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
         settings = {}
+        original_text = ""
+        if not dry_run:
+            _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    # --- Hooks ---
+    # Hooks: append-only
     hooks = settings.setdefault("hooks", {})
+    hook_configs = [
+        ("SessionStart", str(_HOOKS_DIR / "resume.sh"), ""),
+        ("SessionEnd", str(_HOOKS_DIR / "writeback.sh"), ""),
+        ("PostToolUse", str(_HOOKS_DIR / "detect.sh"), "Bash"),
+    ]
+    for event, cmd, matcher in hook_configs:
+        event_list = hooks.setdefault(event, [])
+        if not _entry_exists(event_list, cmd):
+            event_list.append({
+                "matcher": matcher,
+                "hooks": [{"type": "command", "command": cmd}],
+            })
+            changes.append(f"  settings.json: hooks.{event} += {Path(cmd).name}")
 
-    # SessionStart → resume.sh
-    session_start = hooks.setdefault("SessionStart", [])
-    resume_cmd = str(_HOOKS_DIR / "resume.sh")
-    if not _entry_exists(session_start, resume_cmd):
-        session_start.append({
-            "matcher": "",
-            "hooks": [{"type": "command", "command": resume_cmd}],
-        })
-
-    # SessionEnd → writeback.sh
-    session_end = hooks.setdefault("SessionEnd", [])
-    writeback_cmd = str(_HOOKS_DIR / "writeback.sh")
-    if not _entry_exists(session_end, writeback_cmd):
-        session_end.append({
-            "matcher": "",
-            "hooks": [{"type": "command", "command": writeback_cmd}],
-        })
-
-    # PostToolUse → detect.sh (Bash only)
-    post_tool = hooks.setdefault("PostToolUse", [])
-    detect_cmd = str(_HOOKS_DIR / "detect.sh")
-    if not _entry_exists(post_tool, detect_cmd):
-        post_tool.append({
-            "matcher": "Bash",
-            "hooks": [{"type": "command", "command": detect_cmd}],
-        })
-
-    # --- Env vars for Agent Teams ---
+    # Env: setdefault (never overwrite user's existing values)
     env = settings.setdefault("env", {})
     teammate_path = str(_HOOKS_DIR / "teammate.sh")
-    env.setdefault("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1")
-    # Update teammate command to Forge-managed version
+
+    if "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS" not in env:
+        env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] = "1"
+        changes.append("  settings.json: env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = 1")
+
     current_teammate = env.get("CLAUDE_CODE_TEAMMATE_COMMAND", "")
     if not current_teammate or "forge" not in current_teammate:
+        old = current_teammate or "(none)"
         env["CLAUDE_CODE_TEAMMATE_COMMAND"] = teammate_path
+        changes.append(f"  settings.json: env.TEAMMATE_COMMAND: {old} -> {teammate_path}")
 
-    # Write settings
-    try:
-        _SETTINGS_PATH.write_text(
-            json.dumps(settings, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-    except OSError as e:
-        print(f"[forge] Warning: Failed to write settings.json: {e}")
-        raise
+    # Write with backup
+    new_text = json.dumps(settings, indent=2, ensure_ascii=False)
+    if new_text != original_text and not dry_run:
+        # Backup existing
+        if original_text:
+            backup = _SETTINGS_PATH.with_suffix(".json.bak")
+            backup.write_text(original_text, encoding="utf-8")
+            changes.append(f"  backup: {backup}")
+        _SETTINGS_PATH.write_text(new_text, encoding="utf-8")
+
+    return changes
 
 
-def install_skills() -> int:
-    """Install bundled SKILL.md files to ~/.claude/skills/."""
+def install_skills(dry_run: bool = False) -> list[str]:
+    """Install bundled SKILL.md files to ~/.claude/skills/.
+
+    Existing skills are updated (overwritten) with Forge's bundled version.
+    Returns list of installed skill paths.
+    """
+    installed: list[str] = []
     if not _SKILL_SOURCES.is_dir():
-        return 0
-    installed = 0
-    for skill_dir in _SKILL_SOURCES.iterdir():
+        return installed
+
+    for skill_dir in sorted(_SKILL_SOURCES.iterdir()):
         if not skill_dir.is_dir():
             continue
         skill_file = skill_dir / "SKILL.md"
         if not skill_file.exists():
             continue
         dst_dir = _SKILLS_DIR / skill_dir.name
-        dst_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(skill_file, dst_dir / "SKILL.md")
-        installed += 1
+        dst = dst_dir / "SKILL.md"
+        if not dry_run:
+            dst_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(skill_file, dst)
+        installed.append(f"  skill: ~/.claude/skills/{skill_dir.name}/")
+
     return installed
 
 

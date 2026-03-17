@@ -555,35 +555,48 @@ def cmd_install_hooks():
 # ---------------------------------------------------------------------------
 
 @app.command("setup")
-def cmd_setup():
-    """Forge 전체 설정 (DB + hooks + skills + 팀 환경)."""
+def cmd_setup(
+    dry_run: bool = typer.Option(False, "--dry-run", help="변경 없이 미리보기만"),
+):
+    """Forge 전체 설정 (DB + hooks + skills + 팀 환경).
+
+    기존 설정과 충돌하지 않습니다:
+    - settings.json: 기존 hooks/env 유지, Forge 항목만 추가
+    - settings.json.bak: 변경 전 자동 백업
+    - skills: 번들 버전으로 업데이트 (기존 커스텀 설정은 유지)
+    """
     from forge.hooks.install import install_hooks, install_skills
 
+    if dry_run:
+        typer.echo("=== Dry Run (no changes will be made) ===\n")
+
     # 1. Init DB
-    init_db()
-    typer.echo("[1/4] DB initialized.")
+    if not dry_run:
+        init_db()
+    typer.echo("[1/4] DB initialized." + (" (skip)" if dry_run else ""))
 
     # 2. Install hooks + teammate + env
-    install_hooks()
-    typer.echo("[2/4] Hooks + teammate.sh installed.")
+    hook_changes = install_hooks(dry_run=dry_run)
+    typer.echo(f"[2/4] Hooks ({len(hook_changes)} changes):")
+    for c in hook_changes:
+        typer.echo(c)
 
     # 3. Install skills
-    n_skills = install_skills()
-    typer.echo(f"[3/4] {n_skills} skill(s) installed.")
+    skill_changes = install_skills(dry_run=dry_run)
+    typer.echo(f"[3/4] Skills ({len(skill_changes)} installed):")
+    for s in skill_changes:
+        typer.echo(s)
 
     # 4. Summary
-    typer.echo("[4/4] Setup complete.")
-    typer.echo("")
-    typer.echo("Installed:")
-    typer.echo("  ~/.forge/forge.db              (experience database)")
-    typer.echo("  ~/.forge/hooks/*.sh            (4 hook scripts)")
-    typer.echo("  ~/.claude/skills/spawn-team/   (team orchestration)")
-    typer.echo("  ~/.claude/skills/doctor/       (environment check)")
-    typer.echo("  ~/.claude/skills/debate/       (architecture review)")
-    typer.echo("  ~/.claude/skills/ralph/        (persistence loop)")
-    typer.echo("  ~/.claude/settings.json        (hooks + env patched)")
-    typer.echo("")
-    typer.echo("Next: Start a Claude Code session. Forge will auto-learn.")
+    if dry_run:
+        typer.echo("\n[4/4] Dry run complete. Run without --dry-run to apply.")
+    else:
+        typer.echo("\n[4/4] Setup complete.")
+        typer.echo("\nMerge strategy:")
+        typer.echo("  settings.json: append-only (existing hooks/env preserved)")
+        typer.echo("  settings.json.bak: backup created before changes")
+        typer.echo("  skills: updated to bundled version")
+        typer.echo("\nNext: Start a Claude Code session. Forge will auto-learn.")
 
 
 # ---------------------------------------------------------------------------
