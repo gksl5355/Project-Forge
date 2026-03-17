@@ -4,11 +4,12 @@
 
 **코딩 에이전트가 실수에서 배우게 만드는 도구.**
 
+[![CI](https://github.com/gksl5355/Project-Forge/actions/workflows/ci.yml/badge.svg)](https://github.com/gksl5355/Project-Forge/actions/workflows/ci.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-846_passed-brightgreen?logo=pytest&logoColor=white)](#수치)
 [![Dependencies](https://img.shields.io/badge/deps-2_(typer%2C_pyyaml)-blue)](#기술-스택)
 [![Schema](https://img.shields.io/badge/schema-v4-orange)](#실험-추적)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/gksl5355/Project-Forge?style=flat&logo=github)](https://github.com/gksl5355/Project-Forge)
 
 ---
