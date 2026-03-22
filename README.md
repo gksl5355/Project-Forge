@@ -8,6 +8,7 @@
 [![Tests](https://img.shields.io/badge/tests-846_passed-brightgreen?logo=pytest&logoColor=white)](#metrics)
 [![Dependencies](https://img.shields.io/badge/deps-2_(typer%2C_pyyaml)-blue)](#tech-stack)
 [![Schema](https://img.shields.io/badge/schema-v4-orange)](#experiment-tracking)
+[![Hooks](https://img.shields.io/badge/hooks-7_active-purple)](#guard-hooks)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/gksl5355/Project-Forge?style=flat&logo=github)](https://github.com/gksl5355/Project-Forge)
 
@@ -33,7 +34,24 @@ Session Start               Mid-session                 Session End
 ## Quick start
 
 ```bash
+# Option A: pip (global install)
 pip install git+https://github.com/gksl5355/Project-Forge.git
+
+# Option B: uv (recommended)
+uv tool install git+https://github.com/gksl5355/Project-Forge.git
+
+forge setup
+```
+
+> **Note:** Forge hooks require the `forge` command to be globally accessible.
+> If you use a virtual environment or `uv run` only, the hooks will silently fail because they can't find the command on PATH.
+
+**For developers** (editable install — code changes apply immediately):
+
+```bash
+git clone https://github.com/gksl5355/Project-Forge.git
+cd Project-Forge
+uv tool install -e .
 forge setup
 ```
 
@@ -68,6 +86,29 @@ Proceed? [Y/n]:
 | Team skills | `~/.claude/skills/` | spawn-team, doctor, debate, ralph |
 | Model router | `~/.forge/hooks/teammate.sh` | Per-agent model selection |
 | Settings patch | `~/.claude/settings.json` | Hooks + env (append-only merge) |
+
+## Guard hooks
+
+Forge v1.2 adds protective hooks that run automatically alongside the learning hooks:
+
+| Hook | Trigger | What it does |
+|------|---------|-------------|
+| `block-no-verify.sh` | PreToolUse (Bash) | Blocks `--no-verify` flag — prevents Claude from bypassing pre-commit hooks that Forge depends on |
+| `guard-secrets.sh` | PreToolUse (Write/Edit) | Detects AWS keys, GitHub PATs, API keys, private keys in content; warns on writes to `.env`/`.pem`/credential files |
+| `suggest-compact.sh` | PreToolUse (Edit/Write) | Tracks tool call count per session, suggests `/compact` at 50 calls and every 25 after |
+| `cost-tracker.sh` | Stop | Logs session events to `~/.claude/metrics/costs.jsonl` for TokenEfficiency measurement |
+
+**Why these exist:** Claude tends to `--no-verify` when hooks fail (breaking Forge's learning pipeline), hardcode secrets during debugging, and degrade in quality during long sessions. These hooks prevent the most common failure modes automatically.
+
+### `/verify` command
+
+PR-ready check in one command:
+
+```
+/verify
+→ Tests + Coverage | Lint (ruff) | Format | Debug print audit | Change scope
+→ Ready for PR: YES/NO
+```
 
 ## Q-value learning
 

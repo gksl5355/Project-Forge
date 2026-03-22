@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0] - 2026-03-22
+
+### Added
+- Guard hooks: `block-no-verify.sh`, `guard-secrets.sh`, `suggest-compact.sh`, `cost-tracker.sh`
+- `/verify` slash command — PR-ready check (tests, lint, format, debug prints, change scope)
+- PreToolUse hook support: secret detection, `--no-verify` blocking, compaction suggestion
+- Stop hook: session cost/event tracking to `~/.claude/metrics/costs.jsonl`
+- Hooks badge in README
+
+### Changed
+- `forge setup` now installs guard hooks alongside learning hooks
+- README updated with Guard hooks section (EN + KO)
+
 ## [1.1.0] - 2026-03-17
 
 ### Added

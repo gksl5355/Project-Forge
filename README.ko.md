@@ -9,6 +9,7 @@
 [![Tests](https://img.shields.io/badge/tests-846_passed-brightgreen?logo=pytest&logoColor=white)](#수치)
 [![Dependencies](https://img.shields.io/badge/deps-2_(typer%2C_pyyaml)-blue)](#기술-스택)
 [![Schema](https://img.shields.io/badge/schema-v4-orange)](#실험-추적)
+[![Hooks](https://img.shields.io/badge/hooks-7_active-purple)](#가드-훅)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/gksl5355/Project-Forge?style=flat&logo=github)](https://github.com/gksl5355/Project-Forge)
 
@@ -31,10 +32,27 @@ Claude Code를 쓸 때 같은 실수가 반복되거나, 지난번에 찾은 해
 
 **한 번 설치하면 신경 안 써도 됩니다.** Claude Code hooks로 자동 실행됩니다.
 
-## 설치 (2줄)
+## 설치
 
 ```bash
+# 방법 A: pip
 pip install git+https://github.com/gksl5355/Project-Forge.git
+
+# 방법 B: uv (권장)
+uv tool install git+https://github.com/gksl5355/Project-Forge.git
+
+forge setup
+```
+
+> **주의:** Forge hooks는 `forge` 명령어가 시스템 PATH에 있어야 동작합니다.
+> 가상환경 안에서만 설치하거나 `uv run`으로만 실행하면 hooks가 `forge`를 찾지 못해 조용히 실패합니다.
+
+**개발자용** (editable 설치 — 코드 수정 시 재설치 불필요):
+
+```bash
+git clone https://github.com/gksl5355/Project-Forge.git
+cd Project-Forge
+uv tool install -e .
 forge setup
 ```
 
@@ -67,6 +85,29 @@ Skills:
 | 팀 스킬 4종 | `~/.claude/skills/` | spawn-team, doctor, debate, ralph |
 | 모델 라우터 | `~/.forge/hooks/teammate.sh` | 에이전트별 모델 선택 |
 | 설정 패치 | `~/.claude/settings.json` | hooks + env (append-only) |
+
+## 가드 훅
+
+v1.2에서 학습 훅과 함께 자동 실행되는 보호 훅이 추가되었습니다:
+
+| 훅 | 트리거 | 기능 |
+|----|--------|------|
+| `block-no-verify.sh` | PreToolUse (Bash) | `--no-verify` 플래그 차단 — Forge가 의존하는 pre-commit 훅 우회 방지 |
+| `guard-secrets.sh` | PreToolUse (Write/Edit) | AWS 키, GitHub PAT, API 키, 개인키 감지; `.env`/`.pem`/credential 파일 쓰기 경고 |
+| `suggest-compact.sh` | PreToolUse (Edit/Write) | 세션별 도구 호출 횟수 추적, 50회 시 `/compact` 제안, 이후 25회마다 재알림 |
+| `cost-tracker.sh` | Stop | `~/.claude/metrics/costs.jsonl`에 세션 이벤트 기록 (TokenEfficiency 측정용) |
+
+**왜 필요한가:** Claude는 훅 실패 시 `--no-verify`로 우회하려 하고 (Forge 학습 파이프라인 파손), 디버깅 중 시크릿을 하드코딩하며, 긴 세션에서 품질이 저하됩니다. 이 훅들이 가장 흔한 실패 모드를 자동으로 방지합니다.
+
+### `/verify` 커맨드
+
+PR 전 종합 검증을 한 번에:
+
+```
+/verify
+→ 테스트 + 커버리지 | 린트 (ruff) | 포맷 | 디버그 프린트 감사 | 변경 범위
+→ Ready for PR: YES/NO
+```
 
 ## Q값 학습
 
