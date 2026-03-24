@@ -268,14 +268,14 @@ def test_migration_v2_to_v3():
     # Verify team_runs table exists
     conn.execute("INSERT INTO team_runs (workspace_id, run_id) VALUES ('ws', 'r1')")
 
-    # Verify version updated (migrates through to v4)
+    # Verify version updated (migrates through to v5)
     version = conn.execute("SELECT version FROM schema_version").fetchone()[0]
-    assert version == 4
+    assert version == 5
     conn.close()
 
 
-def test_migration_v1_to_v4():
-    """Create v1 schema, migrate through v2, v3, v4."""
+def test_migration_v1_to_v5():
+    """Create v1 schema, migrate through v2, v3, v4, v5."""
     from forge.storage.db import _migrate
 
     conn = sqlite3.connect(":memory:")
@@ -311,13 +311,17 @@ def test_migration_v1_to_v4():
     conn.execute("SELECT active FROM failures LIMIT 0")
     conn.execute("INSERT INTO team_runs (workspace_id, run_id) VALUES ('ws', 'r1')")
 
-    # Verify version updated (migrates through to v4)
+    # Verify version updated (migrates through to v5)
     version = conn.execute("SELECT version FROM schema_version").fetchone()[0]
-    assert version == 4
+    assert version == 5
 
     # Verify v4: experiments table and session extensions
     conn.execute("SELECT id FROM experiments LIMIT 0")
     conn.execute("SELECT config_hash, document_hash, unified_fitness FROM sessions LIMIT 0")
+
+    # Verify v5: model_choices and agents tables
+    conn.execute("SELECT id FROM model_choices LIMIT 0")
+    conn.execute("SELECT agent_id FROM agents LIMIT 0")
     conn.close()
 
 

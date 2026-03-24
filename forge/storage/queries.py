@@ -7,7 +7,7 @@ import logging
 import sqlite3
 from datetime import datetime, UTC
 
-from forge.storage.models import Decision, Experiment, Failure, Knowledge, Rule, Session, TeamRun
+from forge.storage.models import Agent, Decision, Experiment, Failure, Knowledge, ModelChoice, Rule, Session, TeamRun
 
 logger = logging.getLogger("forge")
 
@@ -774,3 +774,119 @@ def get_best_experiment(
         (workspace_id,),
     ).fetchone()
     return _row_to_experiment(row) if row else None
+
+
+# ---------------------------------------------------------------------------
+# v5: Agent management
+# ---------------------------------------------------------------------------
+
+def insert_agent(db: sqlite3.Connection, agent: "Agent") -> int | None:
+    """Register agent. Ignore if agent_id already exists (dedup)."""
+    from forge.storage.models import Agent as _A  # noqa: F811
+    try:
+        cur = db.execute(
+            """INSERT OR IGNORE INTO agents
+               (agent_id, workspace_id, session_id, team_name, role, model, pane_id, pid, status, started_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (agent.agent_id, agent.workspace_id, agent.session_id,
+             agent.team_name, agent.role, agent.model,
+             agent.pane_id, agent.pid, agent.status, _dt_str(agent.started_at)),
+        )
+        db.commit()
+        return cur.lastrowid if cur.rowcount > 0 else None
+    except sqlite3.OperationalError:
+        return None
+
+
+def update_agent_status(
+    db: sqlite3.Connection, agent_id: str, status: str, ended_at: datetime | None = None
+) -> None:
+    """Update agent status (completed/timed_out/error)."""
+    from datetime import datetime, UTC
+    end = _dt_str(ended_at) if ended_at else _dt_str(datetime.now(UTC))
+    db.execute(
+        "UPDATE agents SET status = ?, ended_at = ? WHERE agent_id = ?",
+        (status, end, agent_id),
+    )
+    db.commit()
+
+
+def list_agents(
+    db: sqlite3.Connection, workspace_id: str, team_name: str | None = None, status: str | None = None
+) -> list["Agent"]:
+    """List agents, optionally filtered by team and/or status."""
+    from forge.storage.models import Agent
+    sql = "SELECT * FROM agents WHERE workspace_id = ?"
+    params: list = [workspace_id]
+    if team_name:
+        sql += " AND team_name = ?"
+        params.append(team_name)
+    if status:
+        sql += " AND status = ?"
+        params.append(status)
+    sql += " ORDER BY started_at DESC"
+    try:
+        rows = db.execute(sql, params).fetchall()
+    except sqlite3.OperationalError:
+        return []
+    return [
+        Agent(
+            agent_id=r["agent_id"], workspace_id=r["workspace_id"],
+            session_id=r["session_id"], team_name=r["team_name"],
+            role=r["role"], model=r["model"], pane_id=r["pane_id"],
+            pid=r["pid"], status=r["status"],
+            started_at=_parse_dt(r["started_at"]),
+            ended_at=_parse_dt(r["ended_at"]) if r["ended_at"] else None,
+            id=r["id"],
+        )
+        for r in rows
+    ]
+
+
+# ---------------------------------------------------------------------------
+# v5: Model routing choices
+# ---------------------------------------------------------------------------
+
+def insert_model_choice(
+    db: sqlite3.Connection,
+    workspace_id: str, session_id: str, task_category: str,
+    selected_model: str, agent_name: str | None = None,
+) -> int | None:
+    """Record a model routing choice."""
+    try:
+        cur = db.execute(
+            """INSERT INTO model_choices
+               (workspace_id, session_id, agent_name, task_category, selected_model)
+               VALUES (?, ?, ?, ?, ?)""",
+            (workspace_id, session_id, agent_name, task_category, selected_model),
+        )
+        db.commit()
+        return cur.lastrowid
+    except sqlite3.OperationalError:
+        return None
+
+
+def update_model_choice_outcome(
+    db: sqlite3.Connection, choice_id: int, outcome: float
+) -> None:
+    """Update outcome (0.0-1.0) for a model choice after session completes."""
+    db.execute("UPDATE model_choices SET outcome = ? WHERE id = ?", (outcome, choice_id))
+    db.commit()
+
+
+def get_model_success_rates(
+    db: sqlite3.Connection, workspace_id: str, task_category: str
+) -> list[tuple[str, float, int]]:
+    """Get (model, avg_outcome, count) for a category, ordered by success rate."""
+    try:
+        rows = db.execute(
+            """SELECT selected_model, AVG(outcome) as avg_outcome, COUNT(*) as cnt
+               FROM model_choices
+               WHERE workspace_id = ? AND task_category = ? AND outcome IS NOT NULL
+               GROUP BY selected_model
+               ORDER BY avg_outcome DESC""",
+            (workspace_id, task_category),
+        ).fetchall()
+        return [(r["selected_model"], r["avg_outcome"], r["cnt"]) for r in rows]
+    except sqlite3.OperationalError:
+        return []

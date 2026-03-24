@@ -45,18 +45,17 @@ class ForgeConfig:
     # v1: LLM extraction
     llm_extract_enabled: bool = False
     llm_model: str = "claude-haiku-4-5-20251001"
-    # v2: debate
-    codex_model: str = "gpt-5.4"
-    debate_max_rounds: int = 2
     # v2: dedup interval
     dedup_interval_days: int = 0      # 0=disabled, >0=auto dedup after N days
     # v2: auto ingest
     auto_ingest_enabled: bool = True
-    # v4: team routing thresholds (used by spawn-team SKILL.md)
-    routing_n_parallel_min: int = 3
-    routing_n_files_min: int = 5
-    routing_loc_threshold: int = 200
-    max_agents: int = 5
+    # v5: model routing
+    routing_enabled: bool = True
+    routing_model_map_str: str = "quick=claude-haiku-4-5,standard=claude-sonnet-4-6,deep=claude-opus-4-6,review=claude-sonnet-4-6"
+    # v5: circuit breaker
+    circuit_breaker_enabled: bool = True
+    max_consecutive_failures: int = 10
+    max_tool_calls_per_session: int = 200
 
 
 _DEFAULT_CONFIG_PATH = Path.home() / ".forge" / "config.yml"
@@ -133,17 +132,12 @@ def _validate_config(config: ForgeConfig) -> ForgeConfig:
         config.team_context_tokens = 1000
     if config.forge_context_tokens <= 0:
         config.forge_context_tokens = 2500
-    if config.debate_max_rounds <= 0:
-        config.debate_max_rounds = 2
     if config.dedup_interval_days < 0:
         config.dedup_interval_days = 0
-    if config.routing_n_parallel_min <= 0:
-        config.routing_n_parallel_min = 3
-    if config.routing_n_files_min <= 0:
-        config.routing_n_files_min = 5
-    if config.routing_loc_threshold <= 0:
-        config.routing_loc_threshold = 200
-    if config.max_agents <= 0:
-        config.max_agents = 5
+    # v5: circuit breaker
+    if config.max_consecutive_failures <= 0:
+        config.max_consecutive_failures = 10
+    if config.max_tool_calls_per_session <= 0:
+        config.max_tool_calls_per_session = 200
 
     return config

@@ -12,7 +12,7 @@ def db():
 
     conn.executescript("""
         CREATE TABLE schema_version (version INTEGER NOT NULL);
-        INSERT INTO schema_version VALUES (4);
+        INSERT INTO schema_version VALUES (5);
 
         CREATE TABLE failures (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -126,6 +126,32 @@ def db():
             recorded_at         DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE TABLE model_choices (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            workspace_id    TEXT NOT NULL,
+            session_id      TEXT NOT NULL,
+            agent_name      TEXT,
+            task_category   TEXT NOT NULL,
+            selected_model  TEXT NOT NULL,
+            outcome         REAL,
+            created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE agents (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id        TEXT NOT NULL UNIQUE,
+            workspace_id    TEXT NOT NULL,
+            session_id      TEXT NOT NULL,
+            team_name       TEXT,
+            role            TEXT,
+            model           TEXT,
+            pane_id         TEXT,
+            pid             INTEGER,
+            status          TEXT DEFAULT 'active',
+            started_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ended_at        DATETIME
+        );
+
         CREATE INDEX idx_failures_ws_q ON failures(workspace_id, q DESC);
         CREATE INDEX idx_decisions_ws_status ON decisions(workspace_id, status);
         CREATE INDEX idx_knowledge_ws_q ON knowledge(workspace_id, q DESC);
@@ -133,6 +159,9 @@ def db():
         CREATE INDEX idx_team_runs_ws ON team_runs(workspace_id);
         CREATE INDEX idx_exp_ws_fitness ON experiments(workspace_id, unified_fitness DESC);
         CREATE INDEX idx_exp_ws_time ON experiments(workspace_id, recorded_at DESC);
+        CREATE INDEX idx_model_choices_ws ON model_choices(workspace_id, task_category);
+        CREATE INDEX idx_agents_ws_team ON agents(workspace_id, team_name);
+        CREATE INDEX idx_agents_status ON agents(status);
 
         CREATE TABLE IF NOT EXISTS forge_meta (
             key        TEXT PRIMARY KEY,

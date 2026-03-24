@@ -9,8 +9,8 @@ from forge.storage.db import CURRENT_SCHEMA_VERSION, _migrate, _ensure_schema
 
 
 class TestSchemaVersion:
-    def test_current_version_is_4(self):
-        assert CURRENT_SCHEMA_VERSION == 4
+    def test_current_version_is_5(self):
+        assert CURRENT_SCHEMA_VERSION == 5
 
 
 class TestMigration:
@@ -75,13 +75,17 @@ class TestMigration:
         row = conn.execute("SELECT * FROM team_runs WHERE run_id = 'r1'").fetchone()
         assert row is not None
 
-        # Verify version updated (migrates through to v4)
+        # Verify version updated (migrates through to v5)
         version = conn.execute("SELECT version FROM schema_version").fetchone()[0]
-        assert version == 4
+        assert version == 5
 
         # Verify v4: experiments table and session extensions
         conn.execute("SELECT id FROM experiments LIMIT 0")
         conn.execute("SELECT config_hash, document_hash, unified_fitness FROM sessions LIMIT 0")
+
+        # Verify v5: model_choices and agents tables
+        conn.execute("SELECT id FROM model_choices LIMIT 0")
+        conn.execute("SELECT agent_id FROM agents LIMIT 0")
 
         conn.close()
 

@@ -103,6 +103,34 @@ class TeamRun:
 
 
 @dataclass
+class Agent:
+    agent_id: str
+    workspace_id: str
+    session_id: str
+    team_name: str | None = None
+    role: str | None = None
+    model: str | None = None
+    pane_id: str | None = None
+    pid: int | None = None
+    status: str = "active"           # active | completed | timed_out | error
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    ended_at: datetime | None = None
+    id: int | None = None
+
+
+@dataclass
+class ModelChoice:
+    workspace_id: str
+    session_id: str
+    task_category: str
+    selected_model: str
+    agent_name: str | None = None
+    outcome: float | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    id: int | None = None
+
+
+@dataclass
 class Experiment:
     workspace_id: str
     experiment_type: str = "auto"      # auto | manual | ablation
