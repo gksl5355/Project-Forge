@@ -5,7 +5,15 @@
 ```bash
 git clone https://github.com/gksl5355/Project-Forge.git
 cd Project-Forge
+
+# With pip
+pip install -e ".[dev]"
+
+# Or with uv
 uv pip install -e ".[dev]"
+
+# Or with make
+make dev
 ```
 
 ## Tests
@@ -14,7 +22,7 @@ uv pip install -e ".[dev]"
 pytest tests/ --ignore=tests/test_output_analyzer.py -q
 ```
 
-846 tests, all should pass. Tests use in-memory SQLite (no setup needed).
+1,050+ tests, all should pass. Tests use in-memory SQLite (no setup needed).
 
 ## Code style
 
@@ -30,8 +38,9 @@ pytest tests/ --ignore=tests/test_output_analyzer.py -q
 forge/
 ├── cli.py         # All Typer commands
 ├── config.py      # ForgeConfig dataclass
-├── core/          # Q-value, matcher, promote, context, hashing, directive
-├── engines/       # resume, writeback, detect, fitness, optimizer, measure
+├── core/          # Q-value, matcher, promote, context, circuit breaker
+├── engines/       # resume, writeback, detect, fitness, routing, prompt optimizer
+├── extras/        # optimizer, ablation, dedup, embedding
 ├── storage/       # db, models, queries (raw sqlite3)
 ├── hooks/         # install.py + templates/ (shell scripts)
 └── skills/        # Bundled SKILL.md files
@@ -40,8 +49,8 @@ forge/
 ## Adding a CLI command
 
 1. Add function in `forge/cli.py` with `@app.command("name")`
-2. Add tests in `tests/test_edge_cli.py`
-3. Run tests
+2. Add tests in `tests/`
+3. Run full test suite
 
 ## Pull requests
 
