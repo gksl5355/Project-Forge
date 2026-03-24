@@ -67,6 +67,7 @@ class ForgeConfig:
     injection_recency_weight: float = 0.2
     injection_relevance_weight: float = 0.2
     injection_base_weight: float = 0.6
+    injection_recency_decay: str = "exponential"  # exponential | exponential_slow | linear
     # v5: prompt optimizer — hint quality
     hint_quality_threshold: float = 0.3
     hint_actionability_bonus: float = 0.15

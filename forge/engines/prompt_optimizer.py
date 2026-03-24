@@ -27,10 +27,25 @@ DETAILED_VARIANT = FormatVariant(
     "detailed",
     "[WARN] {pattern} | {quality} | Q:{q:.2f} | seen:{seen} helped:{helped}\n  → {hint}\n  Context: last_seen={last_seen}",
 )
+ESSENTIAL_VARIANT = FormatVariant(
+    "essential",
+    "[WARN] {pattern} → {hint_short}",
+)
+ANNOTATED_VARIANT = FormatVariant(
+    "annotated",
+    "[WARN] {pattern} Q:{q:.2f} → {hint_short}",
+)
 
 
 def generate_ab_format(failure: Failure, variant: str = "concise") -> str:
-    """Generate warning text in A/B variant format."""
+    """Generate warning text in A/B variant format.
+
+    Supported variants:
+    - concise: pattern + Q + hint_short
+    - detailed: pattern + quality + Q + seen/helped + full hint + last_seen
+    - essential: pattern + hint_short (minimal, no Q or stats)
+    - annotated: pattern + Q + hint_short (same as concise)
+    """
     hint_short = (
         failure.avoid_hint[:50] + "..."
         if len(failure.avoid_hint) > 50
@@ -50,6 +65,18 @@ def generate_ab_format(failure: Failure, variant: str = "concise") -> str:
             hint=failure.avoid_hint,
             last_seen=last_seen,
         )
+    elif variant == "essential":
+        return ESSENTIAL_VARIANT.template.format(
+            pattern=failure.pattern,
+            hint_short=hint_short,
+        )
+    elif variant == "annotated":
+        return ANNOTATED_VARIANT.template.format(
+            pattern=failure.pattern,
+            q=failure.q,
+            hint_short=hint_short,
+        )
+    # default to concise
     return CONCISE_VARIANT.template.format(
         pattern=failure.pattern,
         q=failure.q,
@@ -376,6 +403,24 @@ def compute_skill_effectiveness(
 # --- Injection Order ---
 
 
+def _compute_recency_factor(recency_days: float, decay_type: str) -> float:
+    """Compute recency factor based on decay type.
+
+    Args:
+        recency_days: days since last use
+        decay_type: "exponential" (default exp(-0.1*d)), "exponential_slow" (exp(-0.05*d)), or "linear" (max(0, 1 - d/365))
+
+    Returns:
+        Recency factor in [0.0, 1.0], where 1.0 = most recent.
+    """
+    if decay_type == "exponential_slow":
+        return math.exp(-0.05 * recency_days)
+    elif decay_type == "linear":
+        return max(0.0, 1.0 - recency_days / 365.0)
+    else:  # "exponential" (default)
+        return math.exp(-0.1 * recency_days)
+
+
 def compute_injection_score(
     failure: Failure,
     session_tags: list[str] | None = None,
@@ -386,7 +431,7 @@ def compute_injection_score(
 
     Formula: Q * (base_weight + recency_weight*recency_factor + relevance_weight*relevance)
     - base_weight, recency_weight, relevance_weight from config (defaults: 0.6, 0.2, 0.2)
-    - recency_weight = exp(-0.1 * recency_days)  (newer = higher)
+    - recency_factor depends on injection_recency_decay config (exponential/exponential_slow/linear)
     - relevance = Jaccard overlap of failure.tags with session_tags (0 if either empty)
     """
     from forge.config import ForgeConfig
@@ -394,7 +439,7 @@ def compute_injection_score(
     if cfg is None:
         cfg = ForgeConfig()
 
-    recency_weight = math.exp(-0.1 * recency_days)
+    recency_factor = _compute_recency_factor(recency_days, cfg.injection_recency_decay)
 
     relevance = 0.0
     if session_tags and failure.tags:
@@ -404,4 +449,4 @@ def compute_injection_score(
         if union:
             relevance = len(session_set & failure_set) / len(union)
 
-    return failure.q * (cfg.injection_base_weight + cfg.injection_recency_weight * recency_weight + cfg.injection_relevance_weight * relevance)
+    return failure.q * (cfg.injection_base_weight + cfg.injection_recency_weight * recency_factor + cfg.injection_relevance_weight * relevance)

@@ -33,6 +33,8 @@ Session Start               Mid-session                 Session End
 
 ## Quick start
 
+### With pip (Python 3.12+ required)
+
 ```bash
 # Option A: pip (global install)
 pip install git+https://github.com/gksl5355/Project-Forge.git
@@ -53,6 +55,29 @@ git clone https://github.com/gksl5355/Project-Forge.git
 cd Project-Forge
 uv tool install -e .
 forge setup
+```
+
+Or install from source with dev dependencies:
+
+```bash
+git clone https://github.com/gksl5355/Project-Forge.git
+cd Project-Forge
+pip install -e ".[dev]"
+```
+
+### With uv
+
+```bash
+uv pip install git+https://github.com/gksl5355/Project-Forge.git
+forge setup
+```
+
+Or install from source:
+
+```bash
+git clone https://github.com/gksl5355/Project-Forge.git
+cd Project-Forge
+uv pip install -e ".[dev]"
 ```
 
 `forge setup` shows exactly what will change and asks before applying:

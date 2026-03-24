@@ -34,6 +34,8 @@ Claude Code를 쓸 때 같은 실수가 반복되거나, 지난번에 찾은 해
 
 ## 설치
 
+### pip 사용 (Python 3.12+ 필수)
+
 ```bash
 # 방법 A: pip
 pip install git+https://github.com/gksl5355/Project-Forge.git
@@ -54,6 +56,29 @@ git clone https://github.com/gksl5355/Project-Forge.git
 cd Project-Forge
 uv tool install -e .
 forge setup
+```
+
+또는 소스에서 설치 (dev 패키지 포함):
+
+```bash
+git clone https://github.com/gksl5355/Project-Forge.git
+cd Project-Forge
+pip install -e ".[dev]"
+```
+
+### uv 사용
+
+```bash
+uv pip install git+https://github.com/gksl5355/Project-Forge.git
+forge setup
+```
+
+또는 소스에서 설치:
+
+```bash
+git clone https://github.com/gksl5355/Project-Forge.git
+cd Project-Forge
+uv pip install -e ".[dev]"
 ```
 
 `forge setup`은 뭐가 바뀌는지 먼저 보여주고 확인을 받습니다:

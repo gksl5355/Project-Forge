@@ -1142,5 +1142,100 @@ def cmd_research(
     typer.echo(f"\nExperiments: {opt_result.total_experiments}")
 
 
+@app.command("sweep")
+def cmd_sweep(
+    params: str = typer.Option(
+        "ab",
+        "--params",
+        "-p",
+        help="Parameter group: ab | injection | hint | kpi | routing | all",
+    ),
+    top: int = typer.Option(10, "--top", "-t", help="Top N results to display"),
+) -> None:
+    """Run parameter sweep and benchmark.
+
+    Parameter groups:
+    - ab: A/B format variants and thresholds
+    - injection: injection scoring parameters
+    - hint: hint quality parameters
+    - kpi: KPI weights
+    - routing: routing parameters
+    - all: all tunable parameters
+    """
+    from forge.engines.sweep import run_parameter_sweep
+
+    # Define parameter grids for each group
+    param_grids = {
+        "ab": {
+            "ab_variant_threshold": [0.01, 0.05, 0.1, 0.2],
+            "ab_min_observations": [5, 10, 20],
+        },
+        "injection": {
+            "injection_recency_weight": [0.1, 0.2, 0.3],
+            "injection_relevance_weight": [0.1, 0.2, 0.3],
+            "injection_base_weight": [0.4, 0.6, 0.8],
+            "injection_recency_decay": ["exponential", "exponential_slow", "linear"],
+        },
+        "hint": {
+            "hint_actionability_bonus": [0.1, 0.15, 0.2],
+            "hint_vagueness_penalty": [0.05, 0.1, 0.15],
+            "hint_quality_threshold": [0.2, 0.3, 0.4],
+        },
+        "kpi": {
+            "kpi_w_qwhr": [0.2, 0.25, 0.3],
+            "kpi_w_routing": [0.1, 0.15, 0.2],
+            "kpi_w_circuit": [0.05, 0.1, 0.15],
+            "kpi_w_context": [0.05, 0.1, 0.15],
+        },
+        "routing": {
+            "routing_min_observations": [3, 5, 10],
+        },
+        "all": {
+            "alpha": [0.05, 0.1, 0.15],
+            "ab_variant_threshold": [0.01, 0.05, 0.1],
+            "injection_recency_weight": [0.1, 0.2],
+            "hint_actionability_bonus": [0.1, 0.15],
+            "kpi_w_qwhr": [0.2, 0.25],
+        },
+    }
+
+    if params not in param_grids:
+        typer.echo(f"Error: unknown parameter group '{params}'", err=True)
+        typer.echo(f"  Valid groups: {', '.join(param_grids.keys())}", err=True)
+        raise typer.Exit(1)
+
+    grid = param_grids[params]
+    typer.echo(f"Running sweep for '{params}' parameter group...")
+    typer.echo(f"  Grid size: {_count_combinations(grid)} combinations")
+
+    results = run_parameter_sweep(
+        grid,
+        workspace_id="sweep",
+        n_failures=20,
+        n_sessions=5,
+    )
+
+    # Display top N results
+    typer.echo(f"\n=== Top {min(top, len(results))} Results ===")
+    for i, result in enumerate(results[:top], 1):
+        typer.echo(f"\n{i}. Fitness: {result.unified_fitness:.4f}")
+        typer.echo(f"   Params: {result.param_str}")
+        for kpi_name, kpi_value in result.individual_kpis.items():
+            if kpi_name != "unified_fitness" and isinstance(kpi_value, float):
+                typer.echo(f"     {kpi_name}: {kpi_value:.4f}")
+
+    if results:
+        typer.echo(f"\nBest config: {results[0].param_str}")
+        typer.echo(f"Best fitness: {results[0].unified_fitness:.4f}")
+
+
+def _count_combinations(grid: dict[str, list]) -> int:
+    """Count total combinations in parameter grid."""
+    count = 1
+    for values in grid.values():
+        count *= len(values)
+    return count
+
+
 if __name__ == "__main__":
     app()
