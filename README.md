@@ -6,7 +6,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/forge-memory?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/forge-memory/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
-[![Tests](https://img.shields.io/badge/tests-1203_passed-brightgreen?logo=pytest&logoColor=white)](#tech-details)
+[![Tests](https://img.shields.io/badge/tests-1050_passed-brightgreen?logo=pytest&logoColor=white)](#tech-details)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ---
@@ -220,7 +220,7 @@ routing_enabled: true      # Model routing on/off
 | Item | Value |
 |------|-------|
 | Package | [forge-memory](https://pypi.org/project/forge-memory/) |
-| Tests | 1,203 (all passing) |
+| Tests | 1,050+ (all passing) |
 | Dependencies | 2 (typer, pyyaml) |
 | Database | SQLite (built-in, zero config) |
 | Python | 3.12+ |

@@ -74,7 +74,7 @@ class ForgeConfig:
     hint_vagueness_penalty: float = 0.1
     # v5: routing tuning
     routing_min_observations: int = 5
-    # v5: unified fitness v5 weights (must sum to 1.0, optimized via Wave 6 sweep)
+    # v5: unified fitness v5 weights (must sum to 1.0)
     kpi_w_qwhr: float = 0.30
     kpi_w_routing: float = 0.15
     kpi_w_circuit: float = 0.08

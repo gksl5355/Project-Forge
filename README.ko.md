@@ -6,7 +6,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/forge-memory?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/forge-memory/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
-[![Tests](https://img.shields.io/badge/tests-1203_passed-brightgreen?logo=pytest&logoColor=white)](#기술-상세)
+[![Tests](https://img.shields.io/badge/tests-1050_passed-brightgreen?logo=pytest&logoColor=white)](#기술-상세)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ---
@@ -220,7 +220,7 @@ routing_enabled: true      # 모델 라우팅 on/off
 | 항목 | 값 |
 |------|-----|
 | 패키지 | [forge-memory](https://pypi.org/project/forge-memory/) |
-| 테스트 | 1,203개 (전체 통과) |
+| 테스트 | 1,050+개 (전체 통과) |
 | 의존성 | 2개 (typer, pyyaml) |
 | 데이터베이스 | SQLite (내장, 설정 불필요) |
 | Python | 3.12+ |
