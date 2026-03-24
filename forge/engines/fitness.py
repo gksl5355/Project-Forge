@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from forge.config import ForgeConfig
+
 
 def compute_unified_fitness(
     qwhr: float,
@@ -55,26 +57,30 @@ def compute_unified_fitness_v5(
     token_efficiency: float,
     redundant_call_rate: float,
     stale_warning_rate: float,
+    config: ForgeConfig | None = None,
 ) -> float:
-    """Unified Fitness v5 — 8 KPI weighted sum.
+    """Unified Fitness v5 — 8 KPI weighted sum with configurable weights.
 
+    Default weights:
     UF = 0.25*QWHR + 0.15*RoutingAccuracy + 0.10*CircuitEff
        + 0.10*AgentUtil + 0.10*ContextHitRate + 0.10*TokenEff
        + 0.10*(1-RedundantCallRate) + 0.10*(1-StaleWarningRate)
 
-    All inputs clamped to [0.0, 1.0].
+    All inputs clamped to [0.0, 1.0]. Weights read from config.kpi_w_* fields.
     """
+    if config is None:
+        config = ForgeConfig()
 
     def _clamp(v: float) -> float:
         return max(0.0, min(1.0, v))
 
     return (
-        0.25 * _clamp(qwhr)
-        + 0.15 * _clamp(routing_accuracy)
-        + 0.10 * _clamp(circuit_efficiency)
-        + 0.10 * _clamp(agent_utilization)
-        + 0.10 * _clamp(context_hit_rate)
-        + 0.10 * _clamp(token_efficiency)
-        + 0.10 * (1.0 - _clamp(redundant_call_rate))
-        + 0.10 * (1.0 - _clamp(stale_warning_rate))
+        config.kpi_w_qwhr * _clamp(qwhr)
+        + config.kpi_w_routing * _clamp(routing_accuracy)
+        + config.kpi_w_circuit * _clamp(circuit_efficiency)
+        + config.kpi_w_agent * _clamp(agent_utilization)
+        + config.kpi_w_context * _clamp(context_hit_rate)
+        + config.kpi_w_token * _clamp(token_efficiency)
+        + config.kpi_w_redundant * (1.0 - _clamp(redundant_call_rate))
+        + config.kpi_w_stale * (1.0 - _clamp(stale_warning_rate))
     )

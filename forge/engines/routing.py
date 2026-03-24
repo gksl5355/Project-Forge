@@ -67,11 +67,12 @@ def resolve_model(
 
         success_rates = get_model_success_rates(db, workspace_id, category)
 
-        # If we have enough data (>= 5 choices), pick best performing model
+        # If we have enough data, pick best performing model
+        min_obs = config.routing_min_observations
         if success_rates and len(success_rates) > 0:
-            # Find the best model with at least 5 observations
+            # Find the best model with at least min_observations
             for model, avg_outcome, count in success_rates:
-                if count >= 5:
+                if count >= min_obs:
                     logger.debug(
                         "Routing %s/%s → %s (avg_outcome=%.2f, count=%d)",
                         workspace_id, category, model, avg_outcome, count

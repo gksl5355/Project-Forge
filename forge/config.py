@@ -56,6 +56,32 @@ class ForgeConfig:
     circuit_breaker_enabled: bool = True
     max_consecutive_failures: int = 10
     max_tool_calls_per_session: int = 200
+    # v5: agent manager
+    agent_manager_enabled: bool = True
+    # v5: prompt optimizer — A/B testing
+    ab_enabled: bool = True
+    ab_min_observations: int = 10
+    ab_variant_threshold: float = 0.05
+    # v5: prompt optimizer — injection ordering
+    injection_score_enabled: bool = True
+    injection_recency_weight: float = 0.2
+    injection_relevance_weight: float = 0.2
+    injection_base_weight: float = 0.6
+    # v5: prompt optimizer — hint quality
+    hint_quality_threshold: float = 0.3
+    hint_actionability_bonus: float = 0.15
+    hint_vagueness_penalty: float = 0.1
+    # v5: routing tuning
+    routing_min_observations: int = 5
+    # v5: unified fitness v5 weights (must sum to 1.0)
+    kpi_w_qwhr: float = 0.25
+    kpi_w_routing: float = 0.15
+    kpi_w_circuit: float = 0.10
+    kpi_w_agent: float = 0.10
+    kpi_w_context: float = 0.10
+    kpi_w_token: float = 0.10
+    kpi_w_redundant: float = 0.10
+    kpi_w_stale: float = 0.10
 
 
 _DEFAULT_CONFIG_PATH = Path.home() / ".forge" / "config.yml"
@@ -139,5 +165,35 @@ def _validate_config(config: ForgeConfig) -> ForgeConfig:
         config.max_consecutive_failures = 10
     if config.max_tool_calls_per_session <= 0:
         config.max_tool_calls_per_session = 200
+    # v5: A/B testing
+    config.ab_variant_threshold = max(0.0, min(1.0, config.ab_variant_threshold))
+    if config.ab_min_observations <= 0:
+        config.ab_min_observations = 10
+    # v5: injection ordering weights (clamp and normalize)
+    config.injection_recency_weight = max(0.0, min(1.0, config.injection_recency_weight))
+    config.injection_relevance_weight = max(0.0, min(1.0, config.injection_relevance_weight))
+    config.injection_base_weight = max(0.0, min(1.0, config.injection_base_weight))
+    # v5: hint quality
+    config.hint_quality_threshold = max(0.0, min(1.0, config.hint_quality_threshold))
+    config.hint_actionability_bonus = max(0.0, min(0.5, config.hint_actionability_bonus))
+    config.hint_vagueness_penalty = max(0.0, min(0.5, config.hint_vagueness_penalty))
+    # v5: routing
+    if config.routing_min_observations <= 0:
+        config.routing_min_observations = 5
+    # v5: KPI weights — normalize to sum=1.0
+    kpi_sum = (
+        config.kpi_w_qwhr + config.kpi_w_routing + config.kpi_w_circuit
+        + config.kpi_w_agent + config.kpi_w_context + config.kpi_w_token
+        + config.kpi_w_redundant + config.kpi_w_stale
+    )
+    if kpi_sum > 0 and abs(kpi_sum - 1.0) > 0.001:
+        config.kpi_w_qwhr /= kpi_sum
+        config.kpi_w_routing /= kpi_sum
+        config.kpi_w_circuit /= kpi_sum
+        config.kpi_w_agent /= kpi_sum
+        config.kpi_w_context /= kpi_sum
+        config.kpi_w_token /= kpi_sum
+        config.kpi_w_redundant /= kpi_sum
+        config.kpi_w_stale /= kpi_sum
 
     return config

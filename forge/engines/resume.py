@@ -90,6 +90,15 @@ def run_resume(
             team_parts.append(format_l1(team_related_failures))
         return "\n".join(team_parts)
 
+    # 1. A/B Variant Selection (prompt optimizer)
+    variant = "default"
+    if config.ab_enabled:
+        try:
+            from forge.engines.prompt_optimizer import get_best_format
+            variant = get_best_format(db, workspace_id)
+        except Exception as e:
+            logger.debug("A/B variant selection failed: %s", e)
+
     # Use unified context if team runs exist, otherwise fall back to old code path
     if team_runs:
         context = build_unified_context(
@@ -100,10 +109,18 @@ def run_resume(
             knowledge_list=knowledge_list,
             team_runs=team_runs,
             team_failures=team_related_failures,
+            variant=variant,
+            sort_by_injection_score=config.injection_score_enabled,
         )
     else:
         # Fall back to original behavior when no team runs
-        base_context = build_context(regular_failures, rules, config)
+        base_context = build_context(
+            regular_failures,
+            rules,
+            config,
+            variant=variant,
+            sort_by_injection_score=config.injection_score_enabled,
+        )
 
         # decisions + knowledge 섹션을 룰 앞에 삽입
         extra_parts: list[str] = []
@@ -148,5 +165,40 @@ def run_resume(
         document_hash=doc_hash,
     )
     insert_session(db, session)
+
+    # 3. Circuit Breaker Status Check
+    if config.circuit_breaker_enabled:
+        try:
+            from forge.core.circuit_breaker import check_breaker
+            breaker = check_breaker(db, session_id, config)
+            if breaker.is_tripped:
+                context = f"⚠️ [CIRCUIT BREAKER] {breaker.trip_reason}\n\n" + context
+        except Exception as e:
+            logger.debug("Circuit breaker check failed: %s", e)
+
+    # 4. Agent Registration (main agent)
+    if config.agent_manager_enabled:
+        try:
+            from forge.engines.agent_manager import register_agent
+            register_agent(db, workspace_id, session_id, "main", "main")
+        except Exception as e:
+            logger.debug("Agent registration failed: %s", e)
+
+    # 5. Model Routing Context (lightweight)
+    if config.routing_enabled:
+        try:
+            from forge.engines.routing import get_routing_stats
+            stats = get_routing_stats(workspace_id, db)
+            if stats.get("categories"):
+                routing_lines = ["## Model Routing"]
+                for cat, info in stats["categories"].items():
+                    if info.get("best_model"):
+                        routing_lines.append(
+                            f"  {cat}: {info['best_model']} (success: {info.get('success_rate', 0):.0%})"
+                        )
+                if len(routing_lines) > 1:
+                    context = context + "\n\n" + "\n".join(routing_lines)
+        except Exception as e:
+            logger.debug("Model routing context failed: %s", e)
 
     return context

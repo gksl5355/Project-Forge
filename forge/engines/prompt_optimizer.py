@@ -104,8 +104,13 @@ def record_format_outcome(
     conn.commit()
 
 
-def get_best_format(conn: sqlite3.Connection, workspace_id: str) -> str:
-    """Return variant with higher helped rate. Min 10 observations each, else 'concise'."""
+def get_best_format(conn: sqlite3.Connection, workspace_id: str, config: object | None = None) -> str:
+    """Return variant with higher helped rate. Min observations from config, else 'concise'."""
+    from forge.config import ForgeConfig
+    cfg = config if isinstance(config, ForgeConfig) else None
+    if cfg is None:
+        cfg = ForgeConfig()
+
     key = f"ab_outcomes:{workspace_id}"
     row = conn.execute(
         "SELECT value FROM forge_meta WHERE key = ?", (key,)
@@ -118,12 +123,17 @@ def get_best_format(conn: sqlite3.Connection, workspace_id: str) -> str:
     concise = data.get("concise", {"helped": 0, "total": 0})
     detailed = data.get("detailed", {"helped": 0, "total": 0})
 
-    if concise["total"] < 10 or detailed["total"] < 10:
+    if concise["total"] < cfg.ab_min_observations or detailed["total"] < cfg.ab_min_observations:
         return "concise"
 
     concise_rate = concise["helped"] / concise["total"]
     detailed_rate = detailed["helped"] / detailed["total"]
-    return "detailed" if detailed_rate > concise_rate else "concise"
+    # Only switch if threshold exceeded
+    if detailed_rate > concise_rate + cfg.ab_variant_threshold:
+        return "detailed"
+    elif concise_rate > detailed_rate + cfg.ab_variant_threshold:
+        return "concise"
+    return "concise"  # default on tie
 
 
 # --- Hint Quality Scoring ---
@@ -144,15 +154,20 @@ _SPECIFIC_PATTERNS = [
 ]
 
 
-def score_hint_quality(hint: str) -> float:
+def score_hint_quality(hint: str, config: object | None = None) -> float:
     """Score hint text quality 0.0~1.0.
 
     Factors:
     - Length: 10-100 chars optimal (penalty outside)
     - Specificity: code patterns, file paths, error names → bonus
-    - Actionability: starts with verb → bonus
-    - Vagueness: hedging words → penalty
+    - Actionability: starts with verb → bonus (uses config.hint_actionability_bonus)
+    - Vagueness: hedging words → penalty (uses config.hint_vagueness_penalty)
     """
+    from forge.config import ForgeConfig
+    cfg = config if isinstance(config, ForgeConfig) else None
+    if cfg is None:
+        cfg = ForgeConfig()
+
     score = 0.5  # baseline
 
     length = len(hint)
@@ -173,12 +188,12 @@ def score_hint_quality(hint: str) -> float:
     # Actionability bonus
     first_word = hint.split()[0].lower().rstrip(".,;:") if hint.split() else ""
     if first_word in _ACTION_VERBS:
-        score += 0.15
+        score += cfg.hint_actionability_bonus
 
     # Vagueness penalty
     hint_lower = hint.lower()
     vague_count = sum(1 for w in _VAGUE_WORDS if w in hint_lower.split())
-    score -= vague_count * 0.1
+    score -= vague_count * cfg.hint_vagueness_penalty
 
     return max(0.0, min(1.0, score))
 
@@ -365,13 +380,20 @@ def compute_injection_score(
     failure: Failure,
     session_tags: list[str] | None = None,
     recency_days: float = 0.0,
+    config: object | None = None,
 ) -> float:
     """Composite injection priority score.
 
-    Formula: Q * (0.6 + 0.2*recency_weight + 0.2*relevance)
+    Formula: Q * (base_weight + recency_weight*recency_factor + relevance_weight*relevance)
+    - base_weight, recency_weight, relevance_weight from config (defaults: 0.6, 0.2, 0.2)
     - recency_weight = exp(-0.1 * recency_days)  (newer = higher)
     - relevance = Jaccard overlap of failure.tags with session_tags (0 if either empty)
     """
+    from forge.config import ForgeConfig
+    cfg = config if isinstance(config, ForgeConfig) else None
+    if cfg is None:
+        cfg = ForgeConfig()
+
     recency_weight = math.exp(-0.1 * recency_days)
 
     relevance = 0.0
@@ -382,4 +404,4 @@ def compute_injection_score(
         if union:
             relevance = len(session_set & failure_set) / len(union)
 
-    return failure.q * (0.6 + 0.2 * recency_weight + 0.2 * relevance)
+    return failure.q * (cfg.injection_base_weight + cfg.injection_recency_weight * recency_weight + cfg.injection_relevance_weight * relevance)

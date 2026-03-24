@@ -520,6 +520,7 @@ def cmd_writeback(
 @app.command("detect")
 def cmd_detect(
     workspace: str = typer.Option(..., "--workspace", "-w", help="워크스페이스 ID"),
+    session_id: str = typer.Option(None, "--session-id", help="세션 ID (optional)"),
 ):
     """Bash 실패 실시간 감지 (PostToolUse hook용). stdin에서 JSON 읽기."""
     raw = sys.stdin.read()
@@ -533,7 +534,10 @@ def cmd_detect(
     tool_response = payload.get("tool_response") or payload.get("result") or payload
 
     db = get_connection()
-    result = run_detect(tool_name, tool_response, workspace, db)
+    config = load_config()
+    result = run_detect(
+        tool_name, tool_response, workspace, db, session_id=session_id, config=config
+    )
     if result:
         typer.echo(json.dumps(result))
 

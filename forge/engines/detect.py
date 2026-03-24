@@ -7,6 +7,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
+from forge.config import ForgeConfig
 from forge.core.matcher import match_pattern
 from forge.storage.queries import list_failures, list_rules
 
@@ -19,6 +20,8 @@ def run_detect(
     tool_response: dict,
     workspace_id: str,
     db: sqlite3.Connection,
+    session_id: str | None = None,
+    config: ForgeConfig | None = None,
 ) -> dict | None:
     """Bash 실패 감지 → 규칙/패턴 매칭 → hookSpecificOutput JSON 또는 None.
 
@@ -26,6 +29,23 @@ def run_detect(
         None if not a Bash failure or no match.
         dict with pattern info if match found.
     """
+    # Track all tool calls (for circuit breaker)
+    if session_id and config and config.circuit_breaker_enabled:
+        from forge.core.circuit_breaker import check_breaker, increment_tool_call
+
+        try:
+            increment_tool_call(db, session_id)
+            breaker = check_breaker(db, session_id, config)
+            if breaker.is_tripped:
+                return {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PostToolUse",
+                        "additionalContext": f"⚠️ [CIRCUIT BREAKER] {breaker.trip_reason}",
+                    }
+                }
+        except Exception:
+            pass
+
     if tool_name.lower() != "bash":
         return None
 
@@ -36,10 +56,27 @@ def run_detect(
         exit_code = 0
 
     if exit_code == 0:
+        # Reset failures on success
+        if session_id and config and config.circuit_breaker_enabled:
+            from forge.core.circuit_breaker import reset_failures
+
+            try:
+                reset_failures(db, session_id)
+            except Exception:
+                pass
         return None
 
     stderr = tool_response.get("stderr") or ""
     command = tool_response.get("command") or ""
+
+    # Track failures (for circuit breaker)
+    if session_id and config and config.circuit_breaker_enabled:
+        from forge.core.circuit_breaker import increment_failure
+
+        try:
+            increment_failure(db, session_id)
+        except Exception:
+            pass
 
     # Active rules: collect strongest match per enforcement mode
     block_match = None

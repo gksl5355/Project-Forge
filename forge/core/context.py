@@ -178,6 +178,8 @@ def build_unified_context(
     knowledge_list: list[Knowledge] | None = None,
     team_runs: list[TeamRun] | None = None,
     team_failures: list[Failure] | None = None,
+    variant: str = "default",
+    sort_by_injection_score: bool = False,
 ) -> str:
     """Build unified context combining forge experience and team history.
 
@@ -186,9 +188,13 @@ def build_unified_context(
     - Dedup: if a team_failure pattern exists in forge failures, skip it
     - Combines under '## Forge Experience' and '## Team History' headers
     - Total trimmed to total_max_tokens
+
+    Args:
+        variant: A/B format variant ("default" | "concise" | "detailed")
+        sort_by_injection_score: True to sort failures by injection score before building context
     """
     # Build forge experience section
-    forge_context = build_context(failures, rules, config, decisions, knowledge_list)
+    forge_context = build_context(failures, rules, config, decisions, knowledge_list, variant=variant, sort_by_injection_score=sort_by_injection_score)
     trimmed_forge = trim_to_budget(forge_context, config.forge_context_tokens)
 
     # Build team section

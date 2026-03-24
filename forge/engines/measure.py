@@ -190,6 +190,7 @@ def run_measure(
         token_efficiency=te,
         redundant_call_rate=rcr,
         stale_warning_rate=swr,
+        config=config,
     )
 
     return MeasureResult(

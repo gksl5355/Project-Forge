@@ -117,12 +117,27 @@ def _do_writeback(
                 existing.last_used = datetime.now(UTC)
                 update_failure(db, existing)
             else:
-                q0 = initial_q("preventable", config)
+                # 1.1 Score hint quality for auto-detected failures
+                hint_text = f"자동 감지: {bf.stderr[:200]}"
+                try:
+                    from forge.engines.prompt_optimizer import score_hint_quality
+                    quality_score = score_hint_quality(hint_text)
+                    # Map score to quality label
+                    if quality_score >= 0.6:
+                        auto_quality = "near_miss"
+                    elif quality_score >= 0.4:
+                        auto_quality = "preventable"
+                    else:
+                        auto_quality = "environmental"
+                except Exception:
+                    auto_quality = "preventable"  # fallback
+
+                q0 = initial_q(auto_quality, config)
                 new_failure = Failure(
                     workspace_id=workspace_id,
                     pattern=pattern_name,
-                    avoid_hint=f"자동 감지: {bf.stderr[:200]}",
-                    hint_quality="preventable",
+                    avoid_hint=hint_text,
+                    hint_quality=auto_quality,
                     q=q0,
                     source="auto",
                     observed_error=bf.stderr[:500] if bf.stderr else None,
@@ -158,6 +173,17 @@ def _do_writeback(
                 failure.times_warned += 1
             update_failure(db, failure)
             m_q_updates += 1
+
+    # 2.1 Record A/B format outcome
+    if config.ab_enabled:
+        try:
+            from forge.engines.prompt_optimizer import record_format_outcome, get_active_variant
+            variant = get_active_variant(db, workspace_id)
+            # helped = at least one warned pattern was not triggered (warning worked)
+            helped = m_q_updates > 0
+            record_format_outcome(db, workspace_id, variant, helped)
+        except Exception as e:
+            logger.debug("A/B outcome recording skipped: %s", e)
 
     # 3. 시간 감쇠 (last_used > 1일 이상)
     now = datetime.now(UTC)
@@ -205,6 +231,25 @@ def _do_writeback(
 
     # 5.1 Record experiment with unified fitness
     _record_experiment(workspace_id, db, config)
+
+    # 5.2 Reset circuit breaker on session end
+    if config.circuit_breaker_enabled:
+        try:
+            from forge.core.circuit_breaker import reset_failures
+            reset_failures(db, session_id)
+        except Exception:
+            pass
+
+    # 5.3 Complete main agent
+    if config.agent_manager_enabled:
+        try:
+            from forge.engines.agent_manager import get_session_agents, complete_agent
+            agents = get_session_agents(db, session_id)
+            for agent in agents:
+                if agent.status == "active":
+                    complete_agent(db, agent.agent_id, status="completed")
+        except Exception:
+            pass
 
     logger.info("Writeback: %d failures processed, %d Q-updates, %d promotions", n_failures, m_q_updates, p_promotions)
 
