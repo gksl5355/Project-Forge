@@ -763,6 +763,9 @@ def cmd_optimize(
 @app.command("measure")
 def cmd_measure(
     workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
+    v5: bool = typer.Option(False, "--v5", help="v5 KPI 전체 출력"),
+    hints: bool = typer.Option(False, "--hints", help="힌트 품질 분석"),
+    skills: bool = typer.Option(False, "--skills", help="스킬 효과 분석"),
 ) -> None:
     """현재 워크스페이스의 최적화 메트릭 측정."""
     from forge.engines.measure import run_measure
@@ -772,6 +775,40 @@ def cmd_measure(
 
     result = run_measure(workspace, db, config)
 
+    # --- hints mode ---
+    if hints:
+        from forge.engines.prompt_optimizer import list_low_quality_hints, score_hint_quality
+        typer.echo(f"=== Hint Quality Analysis (workspace: {workspace}) ===")
+        low = list_low_quality_hints(db, workspace)
+        if low:
+            for h in low:
+                typer.echo(
+                    f"  {h['pattern']}: score={h['quality_score']:.2f} "
+                    f"warned={h['times_warned']} helped={h['times_helped']}"
+                )
+                typer.echo(f"    hint: {h['avoid_hint'][:80]}")
+        else:
+            typer.echo("  No low-quality hints found.")
+        typer.echo(f"\n  Total failures: {result.total_failures}")
+        return
+
+    # --- skills mode ---
+    if skills:
+        from forge.engines.prompt_optimizer import compute_skill_effectiveness
+        typer.echo(f"=== Skill Effectiveness (workspace: {workspace}) ===")
+        skill_stats = compute_skill_effectiveness(db, workspace)
+        if skill_stats:
+            for s in skill_stats:
+                flag = " ⚠" if s["retry_rate"] > 0.3 or s["circuit_break_rate"] > 0.05 else ""
+                typer.echo(
+                    f"  {s['skill_name']}: retry={s['retry_rate']:.0%} "
+                    f"break={s['circuit_break_rate']:.0%}{flag}"
+                )
+        else:
+            typer.echo("  No skill data available.")
+        return
+
+    # --- default / v5 mode ---
     typer.echo(f"=== Forge Metrics (workspace: {workspace}) ===")
     typer.echo(f"  QWHR:                  {result.qwhr:.2f}")
     typer.echo(f"  Promotion precision:   {result.promotion_precision:.2f}")
@@ -787,6 +824,19 @@ def cmd_measure(
             typer.echo(f"    {section}:   N/A")
         else:
             typer.echo(f"    {section}:   {value:.2f}")
+
+    # v5 KPI
+    if v5:
+        typer.echo("")
+        typer.echo(f"=== v5 KPI ===")
+        typer.echo(f"  Routing accuracy:      {result.routing_accuracy:.2f}")
+        typer.echo(f"  Circuit efficiency:    {result.circuit_efficiency:.2f}")
+        typer.echo(f"  Agent utilization:     {result.agent_utilization:.2f}")
+        typer.echo(f"  Context hit rate:      {result.context_hit_rate:.2f}")
+        typer.echo(f"  Tool efficiency:       {result.tool_efficiency:.2f}")
+        typer.echo(f"  Redundant call rate:   {result.redundant_call_rate:.2f}")
+        typer.echo(f"  Stale warning rate:    {result.stale_warning_rate:.2f}")
+        typer.echo(f"  Unified fitness v5:    {result.unified_fitness_v5:.4f}")
 
     # TO metrics
     if result.to_total_runs > 0:
@@ -889,6 +939,40 @@ def cmd_trend(
 # forge research
 # ---------------------------------------------------------------------------
 
+@app.command("improve-hints")
+def cmd_improve_hints(
+    workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
+    dry_run: bool = typer.Option(True, "--dry-run/--apply", help="적용 없이 제안만"),
+    threshold: float = typer.Option(0.3, "--threshold", help="품질 임계값"),
+) -> None:
+    """저품질 힌트 개선 제안."""
+    from forge.engines.prompt_optimizer import list_low_quality_hints, suggest_hint_improvement
+
+    db = get_connection()
+    low = list_low_quality_hints(db, workspace, threshold=threshold)
+
+    if not low:
+        typer.echo("No low-quality hints found.")
+        return
+
+    typer.echo(f"=== Low-Quality Hints ({len(low)} found, threshold={threshold}) ===")
+    for h in low:
+        improved = suggest_hint_improvement(h["avoid_hint"], h["pattern"])
+        typer.echo(f"\n  [{h['pattern']}] score={h['quality_score']:.2f}")
+        typer.echo(f"    current: {h['avoid_hint'][:100]}")
+        typer.echo(f"    suggest: {improved[:100]}")
+
+        if not dry_run:
+            existing = get_failure_by_pattern(db, workspace, h["pattern"])
+            if existing:
+                existing.avoid_hint = improved
+                update_failure(db, existing)
+                typer.echo("    -> applied")
+
+    if dry_run:
+        typer.echo(f"\n(dry-run mode — use --apply to write changes)")
+
+
 @app.command("research")
 def cmd_research(
     workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
@@ -897,8 +981,42 @@ def cmd_research(
     include_docs: bool = typer.Option(False, "--include-docs", help="문서 directive도 탐색 대상에 포함"),
     target_fitness: float = typer.Option(0.85, "--target-fitness", help="목표 fitness"),
     save_best: bool = typer.Option(False, "--save-best", help="최적 config 저장"),
+    v5: bool = typer.Option(False, "--v5", help="v5 KPI 기반 전체 최적화"),
+    prompts: bool = typer.Option(False, "--prompts", help="프롬프트 포맷 최적화"),
 ) -> None:
     """AutoResearch 확장 — 문서 포함 최적화 루프."""
+    db = get_connection()
+    config = load_config()
+
+    # --- v5 mode ---
+    if v5:
+        from forge.engines.research_v5 import run_research_v5
+        result = run_research_v5(workspace, db, config)
+        typer.echo(f"=== AutoResearch v5 (workspace: {workspace}) ===")
+        typer.echo(f"  Baseline fitness: {result.unified_fitness_before:.4f}")
+        typer.echo(f"  After fitness:    {result.unified_fitness_after:.4f}")
+        if result.improvements:
+            typer.echo(f"\n  Improvements ({len(result.improvements)}):")
+            for imp in result.improvements:
+                typer.echo(f"    {imp['parameter']}: {imp['old']} → {imp['new']} (+{imp['expected_gain']:.4f})")
+        else:
+            typer.echo("  No improvements found.")
+        return
+
+    # --- prompts mode ---
+    if prompts:
+        from forge.engines.research_v5 import run_prompt_research
+        result = run_prompt_research(workspace, db)
+        typer.echo(f"=== Prompt Research (workspace: {workspace}) ===")
+        typer.echo(f"  Best format: {result.best_format}")
+        for variant, stats in result.format_stats.items():
+            typer.echo(f"    {variant}: {stats['helped']}/{stats['total']} ({stats['rate']:.0%})")
+        typer.echo(f"\n  Hint quality distribution:")
+        for level, count in result.hint_quality_distribution.items():
+            typer.echo(f"    {level}: {count}")
+        typer.echo(f"  Low quality hints: {result.low_quality_hints_count}")
+        return
+
     import json as json_mod
     from forge.core.hashing import compute_config_hash, compute_combined_doc_hash, compute_doc_hashes
     from forge.engines.fitness import compute_unified_fitness
@@ -906,9 +1024,6 @@ def cmd_research(
     from forge.extras.optimizer import run_autoresearch, PARAM_GRID
     from forge.storage.models import Experiment
     from forge.storage.queries import insert_experiment
-
-    db = get_connection()
-    config = load_config()
 
     # 1. Baseline measurement
     measure_result = run_measure(workspace, db, config)

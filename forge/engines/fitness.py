@@ -44,3 +44,37 @@ def compute_unified_fitness(
 
     confidence = min(1.0, to_run_count / 5)
     return confidence * to_fitness + (1.0 - confidence) * forge_fitness
+
+
+def compute_unified_fitness_v5(
+    qwhr: float,
+    routing_accuracy: float,
+    circuit_efficiency: float,
+    agent_utilization: float,
+    context_hit_rate: float,
+    token_efficiency: float,
+    redundant_call_rate: float,
+    stale_warning_rate: float,
+) -> float:
+    """Unified Fitness v5 — 8 KPI weighted sum.
+
+    UF = 0.25*QWHR + 0.15*RoutingAccuracy + 0.10*CircuitEff
+       + 0.10*AgentUtil + 0.10*ContextHitRate + 0.10*TokenEff
+       + 0.10*(1-RedundantCallRate) + 0.10*(1-StaleWarningRate)
+
+    All inputs clamped to [0.0, 1.0].
+    """
+
+    def _clamp(v: float) -> float:
+        return max(0.0, min(1.0, v))
+
+    return (
+        0.25 * _clamp(qwhr)
+        + 0.15 * _clamp(routing_accuracy)
+        + 0.10 * _clamp(circuit_efficiency)
+        + 0.10 * _clamp(agent_utilization)
+        + 0.10 * _clamp(context_hit_rate)
+        + 0.10 * _clamp(token_efficiency)
+        + 0.10 * (1.0 - _clamp(redundant_call_rate))
+        + 0.10 * (1.0 - _clamp(stale_warning_rate))
+    )

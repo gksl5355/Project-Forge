@@ -6,11 +6,16 @@ from forge.config import ForgeConfig
 from forge.storage.models import Decision, Failure, Knowledge, Rule, TeamRun
 
 
-def format_l0(failures: list[Failure]) -> str:
+def format_l0(failures: list[Failure], variant: str = "default") -> str:
     """L0: 한 줄 요약 포맷.
 
     형식: [WARN] {pattern} | {quality} | Q:{q} | seen:{n} helped:{n}
+    variant != "default" 이면 prompt_optimizer의 A/B 포맷 사용.
     """
+    if variant != "default":
+        from forge.engines.prompt_optimizer import generate_ab_format
+        return "\n".join(generate_ab_format(f, variant) for f in failures)
+
     lines = []
     for f in failures:
         lines.append(
@@ -20,8 +25,15 @@ def format_l0(failures: list[Failure]) -> str:
     return "\n".join(lines)
 
 
-def format_l1(failures: list[Failure]) -> str:
-    """L1: L0 한 줄 + avoid_hint 상세."""
+def format_l1(failures: list[Failure], variant: str = "default") -> str:
+    """L1: L0 한 줄 + avoid_hint 상세.
+
+    variant != "default" 이면 prompt_optimizer의 A/B 포맷 사용.
+    """
+    if variant != "default":
+        from forge.engines.prompt_optimizer import generate_ab_format
+        return "\n".join(generate_ab_format(f, variant) for f in failures)
+
     lines = []
     for f in failures:
         lines.append(
@@ -68,22 +80,34 @@ def build_context(
     config: ForgeConfig,
     decisions: list[Decision] | None = None,
     knowledge_list: list[Knowledge] | None = None,
+    variant: str = "default",
+    sort_by_injection_score: bool = False,
 ) -> str:
-    """L0 + L1 + Decisions + Knowledge + Rules → 예산 내 포맷된 문자열 반환."""
+    """L0 + L1 + Decisions + Knowledge + Rules → 예산 내 포맷된 문자열 반환.
+
+    variant: A/B 포맷 변형 ("default" | "concise" | "detailed")
+    sort_by_injection_score: True면 injection_score 기준으로 failures 정렬 후 포맷
+    """
     parts: list[str] = []
 
+    # Optional: injection score 기반 정렬
+    ordered = failures
+    if sort_by_injection_score:
+        from forge.engines.prompt_optimizer import compute_injection_score
+        ordered = sorted(failures, key=lambda f: compute_injection_score(f), reverse=True)
+
     # L0: 전체 목록 (l0_max_entries 상한)
-    l0_failures = failures[: config.l0_max_entries]
+    l0_failures = ordered[: config.l0_max_entries]
     if l0_failures:
         parts.append("## Past Failures (L0)")
-        parts.append(format_l0(l0_failures))
+        parts.append(format_l0(l0_failures, variant=variant))
 
     # L1: Q 상위 N개 상세
     l1_count = config.l1_project_entries + config.l1_global_entries
-    l1_failures = sorted(failures, key=lambda f: f.q, reverse=True)[:l1_count]
+    l1_failures = sorted(ordered, key=lambda f: f.q, reverse=True)[:l1_count]
     if l1_failures:
         parts.append("\n## Top Failures — Details (L1)")
-        parts.append(format_l1(l1_failures))
+        parts.append(format_l1(l1_failures, variant=variant))
 
     # Decisions: active만
     active_decisions = [d for d in (decisions or []) if d.status == "active"]

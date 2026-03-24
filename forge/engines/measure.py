@@ -7,7 +7,16 @@ from dataclasses import dataclass, field
 
 from forge.config import ForgeConfig
 from forge.core.context import build_context, estimate_tokens
-from forge.engines.fitness import compute_unified_fitness
+from forge.engines.fitness import compute_unified_fitness, compute_unified_fitness_v5
+from forge.engines.metrics_v5 import (
+    compute_agent_utilization,
+    compute_circuit_efficiency,
+    compute_context_hit_rate,
+    compute_redundant_call_rate,
+    compute_routing_accuracy,
+    compute_stale_warning_rate,
+    compute_tool_efficiency,
+)
 from forge.extras.optimizer import compute_qwhr
 from forge.storage.queries import list_failures, list_rules, list_sessions, list_team_runs
 
@@ -29,6 +38,15 @@ class MeasureResult:
     to_avg_scope_violations: float | None = None
     to_best_configs: dict[str, dict] = field(default_factory=dict)  # complexity → {config, success_rate, runs}
     unified_fitness: float = 0.0
+    # v5 KPI fields
+    routing_accuracy: float = 0.0
+    circuit_efficiency: float = 1.0
+    agent_utilization: float = 0.0
+    context_hit_rate: float = 0.0
+    tool_efficiency: float = 0.0
+    redundant_call_rate: float = 0.0
+    stale_warning_rate: float = 0.0
+    unified_fitness_v5: float = 0.0
 
 
 def run_measure(
@@ -154,6 +172,26 @@ def run_measure(
         to_run_count=to_total_runs,
     )
 
+    # --- v5 KPI ---
+    ra = compute_routing_accuracy(db, workspace_id)
+    ce = compute_circuit_efficiency(db, workspace_id)
+    au = compute_agent_utilization(db, workspace_id)
+    chr_ = compute_context_hit_rate(db, workspace_id)
+    te = compute_tool_efficiency(db, workspace_id)
+    rcr = compute_redundant_call_rate(db, workspace_id)
+    swr = compute_stale_warning_rate(db, workspace_id)
+
+    uf_v5 = compute_unified_fitness_v5(
+        qwhr=qwhr,
+        routing_accuracy=ra,
+        circuit_efficiency=ce,
+        agent_utilization=au,
+        context_hit_rate=chr_,
+        token_efficiency=te,
+        redundant_call_rate=rcr,
+        stale_warning_rate=swr,
+    )
+
     return MeasureResult(
         qwhr=qwhr,
         promotion_precision=promotion_precision,
@@ -169,4 +207,12 @@ def run_measure(
         to_avg_scope_violations=to_avg_scope_violations,
         to_best_configs=to_best_configs,
         unified_fitness=unified,
+        routing_accuracy=ra,
+        circuit_efficiency=ce,
+        agent_utilization=au,
+        context_hit_rate=chr_,
+        tool_efficiency=te,
+        redundant_call_rate=rcr,
+        stale_warning_rate=swr,
+        unified_fitness_v5=uf_v5,
     )
