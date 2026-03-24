@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-with-uv:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies with uv
+        run: uv pip install -e ".[dev]" --system
+
+      - name: Run tests
+        run: |
+          pytest tests/ --ignore=tests/test_output_analyzer.py \
+            --junitxml=test-results.xml \
+            -q
+
+      - name: Run tests with coverage
+        if: matrix.python-version == '3.13'
+        run: |
+          pytest tests/ --ignore=tests/test_output_analyzer.py \
+            --cov=forge --cov-report=term-missing \
+            --cov-report=json:coverage.json \
+            -q
+
+      - name: Generate coverage badge
+        if: matrix.python-version == '3.13'
+        run: |
+          COVERAGE=$(python -c "import json; d=json.load(open('coverage.json')); print(int(d['totals']['percent_covered']))")
+          echo "COVERAGE=${COVERAGE}" >> $GITHUB_ENV
+          echo "Coverage: ${COVERAGE}%"
+
+      - name: Create coverage badge
+        if: matrix.python-version == '3.13'
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_TOKEN }}
+          gistID: forge-coverage
+          filename: coverage.json
+          label: coverage
+          message: ${{ env.COVERAGE }}%
+          valColorRange: ${{ env.COVERAGE }}
+          minColorRange: 50
+          maxColorRange: 90
+
+  test-with-pip:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies with pip
+        run: pip install -e ".[dev]"
+
+      - name: Run tests
+        run: |
+          pytest tests/ --ignore=tests/test_output_analyzer.py \
+            --junitxml=test-results-pip.xml \
+            -q

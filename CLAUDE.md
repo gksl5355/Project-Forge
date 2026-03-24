@@ -89,10 +89,12 @@ spawn-team run → report.yml + events.yml → forge ingest → forge.db → for
 Core: `forge init`, `forge resume`, `forge writeback`, `forge detect`, `forge install-hooks`, `forge setup`
 Data: `forge record`, `forge list`, `forge search`, `forge detail`, `forge edit`, `forge promote`
 Analysis: `forge stats`, `forge decay`, `forge ingest`, `forge recommend`
-Optimization:
-- `forge measure [--v5] [--hints] [--skills]` — metrics (v5 KPI, hint quality, skill effectiveness)
-- `forge research [--v5] [--prompts]` — auto-optimization (v5 sweep, prompt format analysis)
+Score: `forge score [--detail]` — Forge Score 조회 (경험 학습 효과 측정)
+Config: `forge config [--advanced] [--set KEY=VALUE]` — 설정 조회/변경
+Optimization (hidden):
+- `forge measure [--v5] [--hints] [--skills]` — 레거시 metrics
+- `forge tune [--params GROUP] [--top N]` — parameter grid search (고급)
+- `forge research [--v5] [--prompts]` — auto-optimization
 - `forge improve-hints [--dry-run|--apply]` — low-quality hint rewriting
 - `forge trend` — experiment history
-Sweep: `forge sweep [--params ab|injection|hint|kpi|routing|all] [--top N]` — parameter grid search
 Extras: `forge embed`, `forge dedup`, `forge optimize`

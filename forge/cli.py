@@ -764,14 +764,52 @@ def cmd_optimize(
 # forge measure
 # ---------------------------------------------------------------------------
 
-@app.command("measure")
+@app.command("score")
+def cmd_score(
+    workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
+    detail: bool = typer.Option(False, "--detail", "-d", help="세부 항목 전체 출력"),
+) -> None:
+    """Forge Score 조회 — 경험 학습 효과 측정."""
+    from forge.engines.measure import run_measure
+
+    db = get_connection()
+    config = load_config()
+    result = run_measure(workspace, db, config)
+
+    typer.echo(f"=== Forge Score (workspace: {workspace}) ===")
+    typer.echo("")
+    typer.echo(f"  Forge Score:     {result.unified_fitness_v5:.2f} / 1.00")
+    typer.echo("")
+    typer.echo(f"  학습 효과 (QWHR):     {result.qwhr:.2f}")
+    typer.echo(f"  컨텍스트 적중률:       {result.context_hit_rate:.2f}")
+    typer.echo(f"  토큰 효율:             {result.tool_efficiency:.2f}")
+    typer.echo(f"  패턴: {result.total_failures}개 | 세션: {result.total_sessions}개")
+
+    if detail:
+        typer.echo("")
+        typer.echo("  --- 세부 항목 ---")
+        typer.echo(f"  라우팅 정확도:         {result.routing_accuracy:.2f}")
+        typer.echo(f"  브레이커 효율:         {result.circuit_efficiency:.2f}")
+        typer.echo(f"  에이전트 활용률:       {result.agent_utilization:.2f}")
+        typer.echo(f"  중복 호출 비율:        {result.redundant_call_rate:.2f}")
+        typer.echo(f"  무효 경고 비율:        {result.stale_warning_rate:.2f}")
+        typer.echo(f"  승격 정확도:           {result.promotion_precision:.2f}")
+        typer.echo(f"  Q 수렴 속도:           {result.q_convergence_speed:.1f} 세션")
+        if result.to_total_runs > 0:
+            typer.echo("")
+            typer.echo(f"  --- 팀 실행 ({result.to_total_runs}회) ---")
+            sr = f"{result.to_avg_success_rate:.0%}" if result.to_avg_success_rate is not None else "N/A"
+            typer.echo(f"  팀 성공률:             {sr}")
+
+
+@app.command("measure", hidden=True)
 def cmd_measure(
     workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
     v5: bool = typer.Option(False, "--v5", help="v5 KPI 전체 출력"),
     hints: bool = typer.Option(False, "--hints", help="힌트 품질 분석"),
     skills: bool = typer.Option(False, "--skills", help="스킬 효과 분석"),
 ) -> None:
-    """현재 워크스페이스의 최적화 메트릭 측정."""
+    """(레거시) forge score 사용 권장."""
     from forge.engines.measure import run_measure
 
     db = get_connection()
@@ -1142,7 +1180,68 @@ def cmd_research(
     typer.echo(f"\nExperiments: {opt_result.total_experiments}")
 
 
-@app.command("sweep")
+# ---------------------------------------------------------------------------
+# forge config
+# ---------------------------------------------------------------------------
+
+_USER_VISIBLE_PARAMS = {
+    "max_tokens", "l0_max_entries", "llm_model", "alpha", "decay_daily",
+    "promote_threshold", "auto_ingest_enabled", "routing_enabled",
+    "circuit_breaker_enabled", "ab_enabled",
+}
+
+
+@app.command("config")
+def cmd_config(
+    advanced: bool = typer.Option(False, "--advanced", "-a", help="전체 튜닝 파라미터 표시"),
+    set_param: str | None = typer.Option(None, "--set", help="KEY=VALUE 형태로 설정 변경"),
+) -> None:
+    """설정 조회 및 변경."""
+    from forge.config import ForgeConfig, save_config_yaml
+
+    config = load_config()
+
+    if set_param:
+        if "=" not in set_param:
+            typer.echo("Error: --set 형식은 KEY=VALUE", err=True)
+            raise typer.Exit(1)
+        key, value = set_param.split("=", 1)
+        key = key.strip()
+        valid_fields = ForgeConfig.__dataclass_fields__
+        if key not in valid_fields:
+            typer.echo(f"Error: unknown parameter '{key}'", err=True)
+            raise typer.Exit(1)
+        field_type = valid_fields[key].type
+        # Simple type coercion
+        current = getattr(config, key)
+        if isinstance(current, bool):
+            setattr(config, key, value.lower() in ("true", "1", "yes"))
+        elif isinstance(current, int):
+            setattr(config, key, int(value))
+        elif isinstance(current, float):
+            setattr(config, key, float(value))
+        else:
+            setattr(config, key, value)
+        save_config_yaml(config)
+        typer.echo(f"  {key} = {getattr(config, key)}")
+        return
+
+    defaults = ForgeConfig()
+    typer.echo("=== Forge Config ===")
+    typer.echo("")
+    fields = ForgeConfig.__dataclass_fields__
+    for name in fields:
+        if not advanced and name not in _USER_VISIBLE_PARAMS:
+            continue
+        val = getattr(config, name)
+        default = getattr(defaults, name)
+        marker = " *" if val != default else ""
+        typer.echo(f"  {name}: {val}{marker}")
+    if not advanced:
+        typer.echo(f"\n  (* = 기본값에서 변경됨. --advanced 로 전체 파라미터 조회)")
+
+
+@app.command("tune", hidden=True)
 def cmd_sweep(
     params: str = typer.Option(
         "ab",
@@ -1152,16 +1251,7 @@ def cmd_sweep(
     ),
     top: int = typer.Option(10, "--top", "-t", help="Top N results to display"),
 ) -> None:
-    """Run parameter sweep and benchmark.
-
-    Parameter groups:
-    - ab: A/B format variants and thresholds
-    - injection: injection scoring parameters
-    - hint: hint quality parameters
-    - kpi: KPI weights
-    - routing: routing parameters
-    - all: all tunable parameters
-    """
+    """파라미터 튜닝 (고급). 그리드 서치로 최적 설정 탐색."""
     from forge.engines.sweep import run_parameter_sweep
 
     # Define parameter grids for each group
