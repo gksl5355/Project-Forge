@@ -23,9 +23,21 @@ Install it once, and it silently captures every failure and fix from each sessio
 
 On your next session, Forge shows up with: *"Last time you hit this error, you fixed it with async context managers (Q:0.8)"* — before you waste time rediscovering the same fix.
 
+## How It Saves Tokens and Improves Performance
+
+Forge doesn't blindly dump experiences into context. Three mechanisms keep token cost low and effectiveness high:
+
+**1. Q-value ranking** — Every warning's effectiveness is tracked. Helped the agent avoid an error? Q goes up. Got ignored? Q goes down. Only high-Q experiences get injected — so your context stays free of noise.
+
+**2. Time decay** — Old patterns automatically lose priority. A 3-month-old error pattern won't waste tokens in every session. Recent, relevant failures come first.
+
+**3. A/B format testing** — The same warning can be phrased 4 different ways. Forge automatically tests which format your agent actually follows, and converges on the most effective one.
+
+The result: **only proven-useful experiences, in the most effective format, at minimum token cost.**
+
 ## Why Use Forge
 
-### Comparison: How do you handle agent mistakes today?
+### How do you handle agent mistakes today?
 
 | | No tool | CLAUDE.md only | **Forge** |
 |---|---|---|---|
