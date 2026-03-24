@@ -1,364 +1,236 @@
 [English](README.md) | [한국어](README.ko.md)
 
-# Project Forge
+# Forge
 
-**An experience memory layer for coding agents.**
+**Your coding agent keeps making the same mistakes. Forge fixes that.**
 
-[![CI](https://github.com/gksl5355/Project-Forge/actions/workflows/ci.yml/badge.svg)](https://github.com/gksl5355/Project-Forge/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/forge-memory?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/forge-memory/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
-[![Tests](https://img.shields.io/badge/tests-1203_passed-brightgreen?logo=pytest&logoColor=white)](#metrics)
-[![Dependencies](https://img.shields.io/badge/deps-2_(typer%2C_pyyaml)-blue)](#tech-stack)
-[![Schema](https://img.shields.io/badge/schema-v5-orange)](#architecture)
+[![Tests](https://img.shields.io/badge/tests-1203_passed-brightgreen?logo=pytest&logoColor=white)](#tech-details)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ---
 
-## What is Forge?
+## The Problem
 
-Forge is an **experience memory layer** that sits between your coding agent sessions. It is not an orchestrator, not a harness — it is the long-term memory that agents lack.
+Every time you start a new Claude Code session, the agent starts from scratch. It doesn't remember that `--no-verify` broke your pipeline yesterday, or that the async handler needs a specific pattern. You end up repeating the same corrections, wasting time and tokens.
 
-**The problem:** LLM coding agents (Claude Code, Cursor, etc.) start every session from scratch. They repeat the same mistakes, forget yesterday's fixes, and can't learn from past failures.
+## What Forge Does
 
-**Forge solves this by:**
+Forge is an **experience memory layer** for coding agents. Install it once, and it silently:
 
-1. **Remembering** — automatically captures failures, decisions, and rules from every session
-2. **Learning** — uses reinforcement learning (Q-values) to measure which experiences actually help
-3. **Injecting** — feeds the most useful experiences into the next session's context, ranked by proven effectiveness
+- **Captures** every failure, decision, and fix from each session
+- **Learns** which of those experiences actually helped (using reinforcement learning)
+- **Injects** the most useful ones into the next session — before the agent makes the same mistake
 
-It runs as **Claude Code hooks** — zero manual intervention after setup.
+Think of it as **long-term memory** that coding agents don't have.
 
-```
-Session Start               Mid-session                 Session End
-  forge resume                 forge detect                forge writeback
-  ↓                            ↓                           ↓
-  Load Q-ranked patterns       Match stderr to DB          Parse transcript
-  ↓                            ↓                           ↓
-  Inject into context          Warn: "Seen this before,    Update Q-values
-  "Last time this failed,       try: use async with"       Record experiment
-   here's the fix (Q:0.8)"                                 Auto-promote
-```
+## Why Use Forge
 
-## Installation
+| Without Forge | With Forge |
+|---------------|------------|
+| Agent repeats the same error across sessions | Agent is warned before it happens |
+| You manually correct the same patterns | Corrections are remembered and injected automatically |
+| Context window wasted on trial-and-error | Only proven-useful experiences are injected |
+| No way to know if your agent is improving | **Forge Score** measures learning effectiveness |
+| Guard rails require manual setup | Secret detection, `--no-verify` blocking built-in |
+| Each project learns in isolation | Patterns auto-promote across projects |
 
-### Step 1: Install
+## Install (3 steps)
+
+### 1. Install
 
 ```bash
-# pip
 pip install forge-memory
+```
 
-# or uv (faster)
+Or with uv (faster):
+
+```bash
 uv tool install forge-memory
 ```
 
-> **Important:** `forge` must be on your system PATH. Virtual-env-only installs will not work with hooks.
-
-### Step 2: Setup
+### 2. Setup
 
 ```bash
 forge setup
 ```
 
-This one command:
-- Creates the experience database (`~/.forge/forge.db`)
-- Installs learning hooks (session start/end/failure detection)
-- Installs guard hooks (secret detection, `--no-verify` blocking)
-- Installs team skills (spawn-team, doctor, debate, ralph)
-- Patches `~/.claude/settings.json` (append-only, creates backup)
+This single command sets up everything:
+- Experience database
+- Session hooks (auto-learn on every session)
+- Guard hooks (secret detection, safety checks)
+- Team skills
 
-```
-=== Forge Setup ===
+It shows you exactly what will change and asks for confirmation.
 
-Hooks & Settings:
-  + hooks.SessionStart: resume.sh
-  + hooks.SessionEnd: writeback.sh
-  + hooks.PostToolUse: detect.sh
-  = env.AGENT_TEAMS = 1 (ok)           ← existing value preserved
-  ! env.SOME_KEY = X (recommends: Y)   ← conflict shown, not overwritten
+### 3. Done
 
-Skills:
-  + ~/.claude/skills/spawn-team/
+That's it. Start coding. Forge works automatically in the background.
 
-Proceed? [Y/n]:
-```
-
-- `forge setup -y` to skip confirmation
-
-### Step 3: Done
-
-Start coding. Forge learns automatically from every session.
+After a few sessions, check your score:
 
 ```bash
-# Check your Forge Score after a few sessions
 forge score
-
-# View with full breakdown
-forge score --detail
 ```
 
-### For developers (editable install)
-
-```bash
-git clone https://github.com/gksl5355/Project-Forge.git
-cd Project-Forge
-pip install -e ".[dev]"     # or: make dev
-forge setup
-```
-
-## Features
-
-### Automatic Experience Learning
-
-Every session goes through a learn → remember → inject cycle:
-
-| Phase | Hook | What happens |
-|-------|------|-------------|
-| **Start** | `forge resume` | Loads top experiences by Q-value, injects into agent context |
-| **During** | `forge detect` | Matches stderr/failures against known patterns, warns in real-time |
-| **End** | `forge writeback` | Parses transcript, extracts new failures, updates Q-values |
-
-No manual intervention needed. Forge gets smarter with every session.
-
-### Q-Value Learning (MemRL)
-
-Based on [MemRL](https://arxiv.org/html/2601.03192v2) — each experience has a Q-value that measures how useful it actually is:
+## How It Works
 
 ```
-Q ← Q + α(reward - Q)
-
-reward = 1.0  →  Warning helped (failure was avoided)
-reward = 0.0  →  Warning ignored (same error repeated)
-
-Time decay: Q *= (1 - 0.005)^days_since_last_used
+  You start a Claude Code session
+            |
+            v
+  [forge resume] loads relevant past experiences
+  "Last time you hit this error, here's what fixed it (Q:0.8)"
+            |
+            v
+  You code. Agent hits a familiar error pattern
+            |
+            v
+  [forge detect] warns in real-time
+  "Seen this before — try: use async with instead"
+            |
+            v
+  Session ends
+            |
+            v
+  [forge writeback] learns from the session
+  - New patterns captured
+  - Q-values updated (did the warnings help?)
+  - Useful patterns promoted across projects
 ```
 
-High-Q experiences get shown first. Low-Q ones fade away. The system self-corrects.
+All of this happens through **Claude Code hooks** — no manual intervention.
 
-### Forge Score
+## Forge Score
 
 One number that tells you how well Forge is working:
 
 ```bash
-forge score
-# === Forge Score (workspace: default) ===
-#
-#   Forge Score:     0.68 / 1.00
-#
-#   학습 효과 (QWHR):     0.72
-#   컨텍스트 적중률:       0.65
-#   토큰 효율:             0.58
-#   패턴: 47개 | 세션: 23개
+$ forge score
 
-forge score --detail     # full breakdown with routing, circuit breaker, etc.
+=== Forge Score (workspace: default) ===
+
+  Forge Score:     0.68 / 1.00
+
+  Learning effect:       0.72
+  Context hit rate:      0.65
+  Token efficiency:      0.58
+  Patterns: 47 | Sessions: 23
 ```
 
-The score is computed from 8 internal metrics, weighted and optimized through parameter sweeps. You don't need to know the formula — just watch the number go up.
+The score goes up as Forge learns what actually helps your agent. Use `forge score --detail` for the full breakdown.
 
-### Smart Context Injection
+## Key Features
 
-Forge doesn't dump all experiences at once. It ranks them using:
+### Automatic Learning
+Every session is a learning opportunity. Forge captures failures, tracks whether its warnings helped, and adjusts accordingly. No manual tagging or labeling required.
 
-- **Q-value** — proven effectiveness
-- **Recency** — recent failures weighted higher (configurable decay)
-- **Relevance** — tag overlap with current session
+### Smart Injection
+Forge doesn't dump everything it knows into context. It ranks experiences by:
+- **Proven effectiveness** — did this warning actually prevent the error last time?
+- **Recency** — recent failures are weighted higher
+- **Relevance** — tag overlap with the current session
 
-The top experiences are formatted in a token-efficient format and injected at session start.
-
-### Adaptive Warning Formats
-
-Forge automatically tests different warning formats (A/B testing) and converges on whichever format actually helps your agent more:
-
-- **Essential**: `[WARN] pattern → hint` (minimal tokens)
-- **Annotated**: `[WARN] pattern Q:0.75 → hint` (balanced)
-- **Concise**: `[WARN] pattern Q:0.75 → hint_short` (default)
-- **Detailed**: Full stats with seen/helped counts
+Only the top experiences make it into context, saving tokens.
 
 ### Guard Hooks
+Built-in protection against common agent failure modes:
+- **Secret detection** — catches API keys, tokens, and private keys before they're committed
+- **`--no-verify` blocking** — prevents the agent from bypassing pre-commit hooks
+- **Session health** — suggests `/compact` when sessions get too long
 
-Protective hooks that prevent common agent failure modes:
+### Cross-Project Learning
+When Forge sees the same pattern in 2+ projects, it automatically promotes it to a global experience. Your learnings carry across projects.
 
-| Hook | What it does |
-|------|-------------|
-| `block-no-verify.sh` | Blocks `--no-verify` — prevents bypassing pre-commit hooks |
-| `guard-secrets.sh` | Detects API keys, tokens, private keys in writes |
-| `suggest-compact.sh` | Suggests `/compact` after 50+ tool calls |
-| `cost-tracker.sh` | Logs session metrics for efficiency tracking |
+### Adaptive Warning Formats
+Forge A/B tests different warning formats and converges on whatever actually helps your specific agent setup. No configuration needed.
 
 ### Circuit Breaker
+Detects when a session is stuck in a failure loop and intervenes before wasting more tokens.
 
-Automatically detects when a session is stuck in a failure loop:
+## Important Notes
 
-- Tracks consecutive failures and total tool calls per session
-- Trips when limits are exceeded (configurable)
-- Resets on success
+### Requirements
+- **Python 3.12+**
+- **Claude Code** — Forge uses Claude Code's hook system. Other agents are not supported yet.
+- `forge` command must be on your **system PATH** (not just inside a virtualenv)
 
-### Model Routing
+### First Few Sessions
+Forge starts with zero knowledge. It needs a few sessions to build up useful patterns. Don't expect improvements on day one — check `forge score` after 5-10 sessions.
 
-Learns which LLM model works best for different task types:
+### What Forge Is NOT
+- **Not an orchestrator** — Forge doesn't control your agent. It advises.
+- **Not a test runner** — it learns from real coding sessions, not test suites.
+- **Not a replacement for CLAUDE.md** — Forge handles dynamic, session-specific learnings. Static project rules still belong in CLAUDE.md.
 
-```
-quick tasks  → claude-haiku-4-5      (fast, cheap)
-standard     → claude-sonnet-4-6     (balanced)
-deep tasks   → claude-opus-4-6       (thorough)
-review       → claude-sonnet-4-6     (good at review)
-```
-
-Routing accuracy improves as more session data accumulates.
-
-### Team Orchestration Support
-
-Forge integrates with `/spawn-team` to learn from multi-agent runs:
-
-```bash
-forge recommend --complexity MEDIUM
-# → sonnet:2+haiku:1 (3 runs, success: 85%, confidence: medium)
-
-forge resume --team-brief
-# → Recent team failures + recommended config
-```
-
-### Global Promotion
-
-When a pattern appears in 2+ projects, Forge automatically promotes it to a global experience that benefits all workspaces.
+### Privacy
+All data stays local in `~/.forge/forge.db`. Nothing is sent anywhere. The database is plain SQLite — you can inspect, export, or delete it anytime.
 
 ## Commands
 
-### Everyday
+Everyday commands:
 
-| Command | Description |
-|---------|-------------|
-| `forge setup` | Full setup (DB + hooks + skills + settings) |
-| `forge score` | View your Forge Score |
-| `forge score --detail` | Full score breakdown |
-| `forge config` | View/change settings |
-| `forge stats` | Workspace statistics |
+```bash
+forge setup              # Initial setup (run once)
+forge score              # Check your Forge Score
+forge score --detail     # Full breakdown
+forge config             # View settings
+forge config --set KEY=VALUE  # Change a setting
+forge stats              # Workspace statistics
+```
 
-### Data Management
+Data management:
 
-| Command | Description |
-|---------|-------------|
-| `forge record failure` | Record a failure pattern with hint |
-| `forge record decision` | Record a decision with rationale |
-| `forge record rule` | Record a project rule (block/warn/log) |
-| `forge list` | List experiences by type |
-| `forge detail PATTERN` | Detailed view of a pattern |
-| `forge search -t TAG` | Search by tag |
-| `forge edit` | Edit existing records |
+```bash
+forge list               # List all experiences
+forge search -t python   # Search by tag
+forge detail PATTERN     # Detailed view
+forge record failure     # Manually record a pattern
+forge promote ID         # Promote to global
+```
 
-### Analysis
+These run automatically via hooks (you don't need to call them):
 
-| Command | Description |
-|---------|-------------|
-| `forge trend` | Fitness trend over time |
-| `forge recommend` | Team config recommendation |
-| `forge decay` | Apply time decay to stale patterns |
-| `forge promote ID` | Promote to global or knowledge |
-| `forge ingest` | Ingest team run data |
-| `forge dedup` | Merge duplicate patterns |
-
-### Hooks (automatic, not manually called)
-
-| Command | Trigger | Description |
-|---------|---------|-------------|
-| `forge resume` | SessionStart | Inject experiences into context |
-| `forge detect` | PostToolUse | Real-time failure matching |
-| `forge writeback` | SessionEnd | Learn from session transcript |
+```bash
+forge resume             # Session start: inject experiences
+forge detect             # Mid-session: real-time warnings
+forge writeback          # Session end: learn from transcript
+```
 
 ## Configuration
 
 ```bash
-forge config                    # view basic settings
-forge config --set alpha=0.15   # change a setting
-forge config --advanced         # view all parameters (40+)
+forge config             # View basic settings (10 params)
+forge config --advanced  # View all settings (40+ params)
 ```
 
-Basic settings (`~/.forge/config.yml`):
+All settings are optional. Defaults are pre-optimized. Common ones:
 
 ```yaml
-max_tokens: 3000          # max context tokens for injection
-l0_max_entries: 50         # max patterns to show
-llm_model: claude-haiku-4-5-20251001
-alpha: 0.1                 # EMA learning rate
-routing_enabled: true      # model routing on/off
-circuit_breaker_enabled: true
+# ~/.forge/config.yml
+max_tokens: 3000          # Max tokens for context injection
+l0_max_entries: 50         # Max patterns to inject
+alpha: 0.1                 # Learning rate (higher = faster adaptation)
+routing_enabled: true      # Model routing on/off
 ```
 
-All settings are optional. Defaults are pre-optimized.
+## Tech Details
 
-## Architecture
-
-```
-forge/
-├── cli.py              # Typer CLI (all commands)
-├── config.py           # ForgeConfig + YAML loading
-├── engines/            # Core engines
-│   ├── resume.py       # Session start: context injection
-│   ├── detect.py       # Mid-session: failure matching
-│   ├── writeback.py    # Session end: learning
-│   ├── fitness.py      # Forge Score computation
-│   ├── routing.py      # Model routing
-│   ├── prompt_optimizer.py  # A/B testing, hint scoring
-│   ├── sweep.py        # Parameter optimization
-│   └── ...
-├── core/               # Core logic
-│   ├── qvalue.py       # Q-value EMA updates
-│   ├── context.py      # L0/L1 context formatting
-│   ├── circuit_breaker.py
-│   └── ...
-├── storage/            # SQLite storage
-│   ├── db.py           # Schema, connections
-│   ├── models.py       # Dataclass models
-│   └── queries.py      # Raw SQL queries
-├── hooks/              # Shell hook templates
-└── skills/             # Bundled SKILL.md files
-```
-
-**Data flow:**
-
-```
-Agent session
-  ↓ SessionStart hook
-forge resume → DB query → context injection
-  ↓ PostToolUse hook (on failure)
-forge detect → pattern match → real-time warning
-  ↓ SessionEnd hook
-forge writeback → transcript parse → Q update → experiment record
-```
-
-## What Gets Installed
-
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| Experience DB | `~/.forge/forge.db` | SQLite — failures, decisions, rules, experiments |
-| Learning hooks | `~/.forge/hooks/*.sh` | Session start/end/failure detection |
-| Guard hooks | `~/.forge/hooks/*.sh` | Secret guard, no-verify block, compact suggest |
-| Team skills | `~/.claude/skills/` | spawn-team, doctor, debate, ralph |
-| Settings patch | `~/.claude/settings.json` | Hook registration (append-only, backup created) |
-| Config | `~/.forge/config.yml` | Optional overrides (created on first `forge config --set`) |
-
-## Metrics
-
-| Metric | Value |
-|--------|-------|
+| Item | Value |
+|------|-------|
+| Package | [forge-memory](https://pypi.org/project/forge-memory/) |
 | Tests | 1,203 (all passing) |
-| Source modules | 40 |
-| Test files | 42 |
-| Lines of code | ~8,900 |
-| DB schema | v5 |
-| External dependencies | 2 (typer, pyyaml) |
+| Dependencies | 2 (typer, pyyaml) |
+| Database | SQLite (built-in, zero config) |
 | Python | 3.12+ |
+| License | MIT |
 
-## Tech Stack
+### References
 
-- **Python 3.12+** — runtime
-- **SQLite** — built-in DB, zero config, no external server
-- **Typer** — CLI framework
-- **PyYAML** — config parsing
-
-## Acknowledgements
-
-- **[MemRL](https://arxiv.org/html/2601.03192v2)** — EMA-based Q-value learning. Core insight: Q measures "hint usefulness", not "failure severity"
-- **[OpenViking](https://github.com/nicepkg/OpenViking) (ByteDance)** — L0/L1/L2 layered context loading for token efficiency
-- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** — Hook system that makes automatic learning possible
+- **[MemRL](https://arxiv.org/html/2601.03192v2)** — Q-value learning algorithm
+- **[OpenViking](https://github.com/nicepkg/OpenViking)** — Layered context loading
+- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** — Hook system
 
 ## License
 
