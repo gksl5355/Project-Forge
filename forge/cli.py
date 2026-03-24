@@ -1252,7 +1252,11 @@ def cmd_sweep(
     top: int = typer.Option(10, "--top", "-t", help="Top N results to display"),
 ) -> None:
     """파라미터 튜닝 (고급). 그리드 서치로 최적 설정 탐색."""
-    from forge.engines.sweep import run_parameter_sweep
+    try:
+        from forge.engines.sweep import run_parameter_sweep
+    except ImportError:
+        typer.echo("Tune module not available.", err=True)
+        raise typer.Exit(1)
 
     # Define parameter grids for each group
     param_grids = {
