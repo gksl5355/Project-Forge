@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import pytest
 
-from forge.engines.extractor import _parse_extraction_response
+from forge.extras.extractor import _parse_extraction_response
 
 
 class TestParseExtractionResponse:

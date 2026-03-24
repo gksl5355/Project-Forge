@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, UTC
 
 from forge.config import ForgeConfig
-from forge.core.embedding import embed_text, get_embedding, get_embedder
+from forge.extras.embedding import embed_text, get_embedding, get_embedder
 from forge.storage.models import Failure
 from forge.storage.queries import list_failures, soft_delete_failure, update_failure
 

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from forge.config import ForgeConfig
 from forge.core.context import build_context, estimate_tokens
 from forge.engines.fitness import compute_unified_fitness
-from forge.engines.optimizer import compute_qwhr
+from forge.extras.optimizer import compute_qwhr
 from forge.storage.queries import list_failures, list_rules, list_sessions, list_team_runs
 
 

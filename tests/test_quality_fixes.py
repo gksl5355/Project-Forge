@@ -15,9 +15,9 @@ except ImportError:
 import pytest
 
 from forge.config import ForgeConfig, load_config, _validate_config
-from forge.core.dedup import find_duplicates
+from forge.extras.dedup import find_duplicates
 from forge.core.output_analyzer import _normalize_command, _estimate_useful_portion
-from forge.engines.extractor import _parse_extraction_response
+from forge.extras.extractor import _parse_extraction_response
 from forge.storage.models import Knowledge, Rule, TeamRun
 from forge.storage.queries import (
     get_knowledge_by_id,
@@ -268,14 +268,14 @@ def test_migration_v2_to_v3():
     # Verify team_runs table exists
     conn.execute("INSERT INTO team_runs (workspace_id, run_id) VALUES ('ws', 'r1')")
 
-    # Verify version updated (migrates through to v5)
+    # Verify version updated (migrates through to v4)
     version = conn.execute("SELECT version FROM schema_version").fetchone()[0]
     assert version == 5
     conn.close()
 
 
-def test_migration_v1_to_v5():
-    """Create v1 schema, migrate through v2, v3, v4, v5."""
+def test_migration_v1_to_v4():
+    """Create v1 schema, migrate through v2, v3, v4."""
     from forge.storage.db import _migrate
 
     conn = sqlite3.connect(":memory:")
@@ -311,17 +311,13 @@ def test_migration_v1_to_v5():
     conn.execute("SELECT active FROM failures LIMIT 0")
     conn.execute("INSERT INTO team_runs (workspace_id, run_id) VALUES ('ws', 'r1')")
 
-    # Verify version updated (migrates through to v5)
+    # Verify version updated (migrates through to v4)
     version = conn.execute("SELECT version FROM schema_version").fetchone()[0]
     assert version == 5
 
     # Verify v4: experiments table and session extensions
     conn.execute("SELECT id FROM experiments LIMIT 0")
     conn.execute("SELECT config_hash, document_hash, unified_fitness FROM sessions LIMIT 0")
-
-    # Verify v5: model_choices and agents tables
-    conn.execute("SELECT id FROM model_choices LIMIT 0")
-    conn.execute("SELECT agent_id FROM agents LIMIT 0")
     conn.close()
 
 

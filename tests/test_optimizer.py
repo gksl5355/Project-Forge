@@ -7,7 +7,7 @@ import sqlite3
 import pytest
 
 from forge.config import ForgeConfig, save_config_yaml, load_config
-from forge.engines.optimizer import (
+from forge.extras.optimizer import (
     ExperimentResult,
     ExperimentSimulator,
     PARAM_GRID,

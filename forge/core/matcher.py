@@ -128,7 +128,7 @@ def match_pattern_v2(
     if not config.vector_search_enabled:
         return []
 
-    from forge.core.embedding import embed_text, get_embedding
+    from forge.extras.embedding import embed_text, get_embedding
 
     # Try to embed query
     query_embedding = embed_text(query_text)

@@ -8,12 +8,12 @@ from pathlib import Path
 import pytest
 
 from forge.core.directive import Directive
-from forge.engines.directive_extractor import (
+from forge.extras.directive_extractor import (
     build_dependency_graph,
     classify_directive,
     extract_directives,
 )
-from forge.engines.ablation import (
+from forge.extras.ablation import (
     AblationCandidate,
     apply_ablation,
     generate_ablation_candidates,

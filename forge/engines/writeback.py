@@ -216,7 +216,7 @@ def _llm_extract_step(
     config: ForgeConfig,
 ) -> None:
     """LLM-based extraction of failures and decisions from transcript."""
-    from forge.engines.extractor import llm_extract
+    from forge.extras.extractor import llm_extract
 
     extracted = llm_extract(transcript_path, model=config.llm_model)
     if not extracted:
@@ -314,7 +314,7 @@ def _auto_dedup_step(
             pass
 
     try:
-        from forge.core.dedup import run_dedup
+        from forge.extras.dedup import run_dedup
         results = run_dedup(db, workspace_id, config, auto=True)
         if results:
             logger.info("Auto dedup: %d pair(s) merged", len(results))

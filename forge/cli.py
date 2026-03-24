@@ -644,7 +644,7 @@ def cmd_embed(
     workspace: str = typer.Option("default", "--workspace", "-w", help="워크스페이스 ID"),
 ):
     """실패 패턴에 대한 벡터 임베딩 생성."""
-    from forge.core.embedding import embed_failures, get_embedder
+    from forge.extras.embedding import embed_failures, get_embedder
 
     if get_embedder() is None:
         typer.echo("Error: sentence-transformers not installed. Run: pip install sentence-transformers", err=True)
@@ -665,7 +665,7 @@ def cmd_dedup(
     auto: bool = typer.Option(False, "--auto", help="자동 병합 (확인 없이)"),
 ):
     """유사 실패 패턴 중복 탐지 및 병합."""
-    from forge.core.dedup import run_dedup
+    from forge.extras.dedup import run_dedup
 
     db = init_db()
     config = load_config()
@@ -699,7 +699,7 @@ def cmd_optimize(
     dry_run: bool = typer.Option(False, "--dry-run", help="저장하지 않고 결과만 표시"),
 ):
     """컨텍스트 설정 자동 최적화 (AutoResearch)."""
-    from forge.engines.optimizer import PARAM_GRID, run_autoresearch
+    from forge.extras.optimizer import PARAM_GRID, run_autoresearch
 
     db = get_connection()
     config = load_config()
@@ -903,7 +903,7 @@ def cmd_research(
     from forge.core.hashing import compute_config_hash, compute_combined_doc_hash, compute_doc_hashes
     from forge.engines.fitness import compute_unified_fitness
     from forge.engines.measure import run_measure
-    from forge.engines.optimizer import run_autoresearch, PARAM_GRID
+    from forge.extras.optimizer import run_autoresearch, PARAM_GRID
     from forge.storage.models import Experiment
     from forge.storage.queries import insert_experiment
 
@@ -1002,7 +1002,7 @@ def cmd_research(
     if include_docs:
         typer.echo(f"\n=== Document Directive Analysis ===")
         try:
-            from forge.engines.directive_extractor import extract_directives
+            from forge.extras.directive_extractor import extract_directives
             # Find CLAUDE.md in cwd
             claude_md = Path.cwd() / "CLAUDE.md"
             if claude_md.exists():
