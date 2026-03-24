@@ -5,9 +5,9 @@
 **Make your coding agent learn from its mistakes.**
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
-[![Tests](https://img.shields.io/badge/tests-846_passed-brightgreen?logo=pytest&logoColor=white)](#metrics)
+[![Tests](https://img.shields.io/badge/tests-1069_passed-brightgreen?logo=pytest&logoColor=white)](#metrics)
 [![Dependencies](https://img.shields.io/badge/deps-2_(typer%2C_pyyaml)-blue)](#tech-stack)
-[![Schema](https://img.shields.io/badge/schema-v4-orange)](#experiment-tracking)
+[![Schema](https://img.shields.io/badge/schema-v5-orange)](#experiment-tracking)
 [![Hooks](https://img.shields.io/badge/hooks-7_active-purple)](#guard-hooks)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/gksl5355/Project-Forge?style=flat&logo=github)](https://github.com/gksl5355/Project-Forge)

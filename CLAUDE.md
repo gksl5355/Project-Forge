@@ -14,8 +14,9 @@ An experience learning CLI tool for coding agents. Accumulates failures, decisio
 forge/
 ├── cli.py              # Typer app, all commands registered here
 ├── config.py            # ForgeConfig dataclass + YAML loading + defaults
-├── engines/             # resume, writeback, detect, transcript, fitness, optimizer, measure
-├── core/                # qvalue, matcher, promote, context, hashing, directive
+├── engines/             # resume, writeback, detect, transcript, fitness, measure, routing, agent_manager, metrics_v5, prompt_optimizer, research_v5
+├── core/                # qvalue, matcher, promote, context, hashing, directive, circuit_breaker, output_analyzer
+├── extras/              # optimizer, ablation, dedup, directive_extractor, extractor, embedding
 ├── storage/             # db, models, queries (raw sqlite3)
 ├── hooks/               # install, templates/ (resume/writeback/detect/teammate.sh)
 └── skills/              # bundled SKILL.md files (spawn-team, doctor, debate, ralph)
@@ -63,10 +64,32 @@ spawn-team run → report.yml + events.yml → forge ingest → forge.db → for
 - **Silo C (Engines + CLI + Hooks)**: forge/cli.py, forge/engines/*, forge/hooks/*
 - **Shared**: tests/conftest.py, pyproject.toml, CLAUDE.md
 
-## Experiment Tracking (v4)
+## Experiment Tracking (v5)
 
-- Schema v4: `experiments` table + `sessions` extension (config_hash, document_hash, unified_fitness)
-- Unified fitness: auto-interpolates forge-only (0.6*QWHR+0.25*TokenEff+0.15*PromoPrecision) and TO-integrated modes
+- Schema v5: `experiments`, `sessions`, `model_choices`, `agents` tables
+- Unified fitness v4: auto-interpolates forge-only (0.6*QWHR+0.25*TokenEff+0.15*PromoPrecision) and TO-integrated modes
+- **Unified fitness v5** (8 KPI): `0.25*QWHR + 0.15*RoutingAccuracy + 0.10*CircuitEff + 0.10*AgentUtil + 0.10*ContextHitRate + 0.10*TokenEff + 0.10*(1-RedundantCallRate) + 0.10*(1-StaleWarningRate)`
 - Config/document hashing: SHA256[:12] for change detection
 - Directive model: atomic document decomposition (rule, threshold, workflow, description, constraint)
-- CLI: `forge trend`, `forge research`, `forge measure` (unified_fitness output)
+- Model routing: category-based model selection with success rate tracking
+- Circuit breaker: consecutive failure / tool call limits (forge_meta state)
+- Agent lifecycle: register → active → completed/error/timed_out
+
+## Prompt Optimization
+
+- **A/B format testing**: concise vs detailed warning formats, EMA-tracked effectiveness (forge_meta)
+- **Hint quality scoring**: length, specificity, actionability, vagueness → 0.0~1.0
+- **Skill directive analysis**: SKILL.md parsing, clarity scoring, problematic directive flagging
+- **Injection order**: `Q × recency × relevance` composite score for context ordering
+
+## CLI Commands
+
+Core: `forge init`, `forge resume`, `forge writeback`, `forge detect`, `forge install-hooks`, `forge setup`
+Data: `forge record`, `forge list`, `forge search`, `forge detail`, `forge edit`, `forge promote`
+Analysis: `forge stats`, `forge decay`, `forge ingest`, `forge recommend`
+Optimization:
+- `forge measure [--v5] [--hints] [--skills]` — metrics (v5 KPI, hint quality, skill effectiveness)
+- `forge research [--v5] [--prompts]` — auto-optimization (v5 sweep, prompt format analysis)
+- `forge improve-hints [--dry-run|--apply]` — low-quality hint rewriting
+- `forge trend` — experiment history
+Extras: `forge embed`, `forge dedup`, `forge optimize`

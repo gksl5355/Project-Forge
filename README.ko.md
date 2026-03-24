@@ -6,9 +6,9 @@
 
 [![CI](https://github.com/gksl5355/Project-Forge/actions/workflows/ci.yml/badge.svg)](https://github.com/gksl5355/Project-Forge/actions/workflows/ci.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
-[![Tests](https://img.shields.io/badge/tests-846_passed-brightgreen?logo=pytest&logoColor=white)](#수치)
+[![Tests](https://img.shields.io/badge/tests-1069_passed-brightgreen?logo=pytest&logoColor=white)](#수치)
 [![Dependencies](https://img.shields.io/badge/deps-2_(typer%2C_pyyaml)-blue)](#기술-스택)
-[![Schema](https://img.shields.io/badge/schema-v4-orange)](#실험-추적)
+[![Schema](https://img.shields.io/badge/schema-v5-orange)](#실험-추적)
 [![Hooks](https://img.shields.io/badge/hooks-7_active-purple)](#가드-훅)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/gksl5355/Project-Forge?style=flat&logo=github)](https://github.com/gksl5355/Project-Forge)
