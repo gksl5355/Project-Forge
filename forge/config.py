@@ -74,15 +74,15 @@ class ForgeConfig:
     hint_vagueness_penalty: float = 0.1
     # v5: routing tuning
     routing_min_observations: int = 5
-    # v5: unified fitness v5 weights (must sum to 1.0)
-    kpi_w_qwhr: float = 0.25
+    # v5: unified fitness v5 weights (must sum to 1.0, optimized via Wave 6 sweep)
+    kpi_w_qwhr: float = 0.30
     kpi_w_routing: float = 0.15
-    kpi_w_circuit: float = 0.10
-    kpi_w_agent: float = 0.10
-    kpi_w_context: float = 0.10
-    kpi_w_token: float = 0.10
-    kpi_w_redundant: float = 0.10
-    kpi_w_stale: float = 0.10
+    kpi_w_circuit: float = 0.08
+    kpi_w_agent: float = 0.08
+    kpi_w_context: float = 0.15
+    kpi_w_token: float = 0.12
+    kpi_w_redundant: float = 0.06
+    kpi_w_stale: float = 0.06
 
 
 _DEFAULT_CONFIG_PATH = Path.home() / ".forge" / "config.yml"

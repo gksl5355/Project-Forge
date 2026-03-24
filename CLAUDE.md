@@ -68,7 +68,7 @@ spawn-team run → report.yml + events.yml → forge ingest → forge.db → for
 
 - Schema v5: `experiments`, `sessions`, `model_choices`, `agents` tables
 - Unified fitness v4: auto-interpolates forge-only (0.6*QWHR+0.25*TokenEff+0.15*PromoPrecision) and TO-integrated modes
-- **Unified fitness v5** (8 KPI): `0.25*QWHR + 0.15*RoutingAccuracy + 0.10*CircuitEff + 0.10*AgentUtil + 0.10*ContextHitRate + 0.10*TokenEff + 0.10*(1-RedundantCallRate) + 0.10*(1-StaleWarningRate)`
+- **Unified fitness v5** (8 KPI, Wave 6 sweep-optimized): `0.30*QWHR + 0.15*RoutingAccuracy + 0.08*CircuitEff + 0.08*AgentUtil + 0.15*ContextHitRate + 0.12*TokenEff + 0.06*(1-RedundantCallRate) + 0.06*(1-StaleWarningRate)`
 - Config/document hashing: SHA256[:12] for change detection
 - Directive model: atomic document decomposition (rule, threshold, workflow, description, constraint)
 - Model routing: category-based model selection with success rate tracking
@@ -77,10 +77,12 @@ spawn-team run → report.yml + events.yml → forge ingest → forge.db → for
 
 ## Prompt Optimization
 
-- **A/B format testing**: concise vs detailed warning formats, EMA-tracked effectiveness (forge_meta)
+- **A/B format testing**: 4 variants (essential/annotated/concise/detailed), EMA-tracked effectiveness (forge_meta)
 - **Hint quality scoring**: length, specificity, actionability, vagueness → 0.0~1.0
 - **Skill directive analysis**: SKILL.md parsing, clarity scoring, problematic directive flagging
 - **Injection order**: `Q × recency × relevance` composite score for context ordering
+- **Recency decay**: 3 modes (exponential/exponential_slow/linear) via `injection_recency_decay` config
+- **Parameter sweep**: `forge sweep --params GROUP` for grid search optimization
 
 ## CLI Commands
 
@@ -92,4 +94,5 @@ Optimization:
 - `forge research [--v5] [--prompts]` — auto-optimization (v5 sweep, prompt format analysis)
 - `forge improve-hints [--dry-run|--apply]` — low-quality hint rewriting
 - `forge trend` — experiment history
+Sweep: `forge sweep [--params ab|injection|hint|kpi|routing|all] [--top N]` — parameter grid search
 Extras: `forge embed`, `forge dedup`, `forge optimize`

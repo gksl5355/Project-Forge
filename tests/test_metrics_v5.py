@@ -378,19 +378,19 @@ class TestUnifiedFitnessV5:
     def test_all_zeros(self):
         result = compute_unified_fitness_v5(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         # redundant_call_rate=0 → (1-0)=1 term, stale_warning_rate=0 → (1-0)=1 term
-        # = 0.10 + 0.10 = 0.20
-        assert abs(result - 0.20) < 1e-9
+        # = 0.06 + 0.06 = 0.12
+        assert abs(result - 0.12) < 1e-9
 
     def test_all_ones(self):
         result = compute_unified_fitness_v5(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
         # redundant=1 → (1-1)=0, stale=1 → (1-1)=0
-        # = 0.25+0.15+0.10+0.10+0.10+0.10+0 +0 = 0.80
-        assert abs(result - 0.80) < 1e-9
+        # = 0.30+0.15+0.08+0.08+0.15+0.12+0+0 = 0.88
+        assert abs(result - 0.88) < 1e-9
 
     def test_all_perfect_with_zero_penalites(self):
         # qwhr=1, routing=1, circuit=1, agent=1, context=1, token=1, redundant=0, stale=0
         result = compute_unified_fitness_v5(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0)
-        # 0.25+0.15+0.10+0.10+0.10+0.10+0.10+0.10 = 1.0
+        # all positive KPIs=1, negative KPIs=0 → (1-0)=1 → sum of all weights = 1.0
         assert abs(result - 1.0) < 1e-9
 
     def test_known_inputs(self):
@@ -405,21 +405,20 @@ class TestUnifiedFitnessV5:
             stale_warning_rate=0.3,
         )
         expected = (
-            0.25 * 0.8
+            0.30 * 0.8
             + 0.15 * 0.6
-            + 0.10 * 1.0
-            + 0.10 * 0.7
-            + 0.10 * 0.5
-            + 0.10 * 0.4
-            + 0.10 * (1 - 0.2)
-            + 0.10 * (1 - 0.3)
+            + 0.08 * 1.0
+            + 0.08 * 0.7
+            + 0.15 * 0.5
+            + 0.12 * 0.4
+            + 0.06 * (1 - 0.2)
+            + 0.06 * (1 - 0.3)
         )
         assert abs(result - expected) < 1e-9
 
     def test_clamping_above_1(self):
         result = compute_unified_fitness_v5(2.0, 2.0, 2.0, 2.0, 2.0, 2.0, -1.0, -1.0)
-        # All clamped: qwhr..token→1, redundant→0 (clamp(-1)=0) → (1-0)=1, stale→0 → (1-0)=1
-        # = 0.25+0.15+0.10+0.10+0.10+0.10+0.10+0.10 = 1.0
+        # All clamped: positive→1, negative→clamp(-1)=0 → (1-0)=1 → sum = 1.0
         assert abs(result - 1.0) < 1e-9
 
     def test_clamping_below_0(self):
