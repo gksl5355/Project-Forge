@@ -25,27 +25,44 @@ On your next session, Forge shows up with: *"Last time you hit this error, you f
 
 ## Why Use Forge
 
-| Without Forge | With Forge |
-|---------------|------------|
-| Agent repeats the same error across sessions | Agent is warned before it happens |
-| You manually correct the same patterns | Corrections are remembered and injected automatically |
-| Context window wasted on trial-and-error | Only proven-useful experiences are injected, saving tokens |
-| No protection against API key leaks | Automatic secret detection before they're committed |
-| Each project learns in isolation | Patterns auto-promote across projects |
+### Comparison: How do you handle agent mistakes today?
 
-### Forge vs. CLAUDE.md
+| | No tool | CLAUDE.md only | **Forge** |
+|---|---|---|---|
+| **Error repetition** | Same error every session | Reduced if you wrote a rule | Automatically warned before it happens |
+| **Knowledge capture** | Lost when session ends | You write rules manually | Auto-captured from every session |
+| **Maintenance effort** | None (but pain accumulates) | You maintain every rule | Zero — learns and forgets on its own |
+| **Cross-project sharing** | None | Copy-paste between repos | Auto-promotes after 2+ projects |
+| **Effectiveness tracking** | No way to measure | No way to measure | **Forge Score** — 8 metrics tracked |
+| **Secret leak protection** | None | None | Built-in detection (API keys, tokens) |
+| **Session failure detection** | Manual | Manual | Real-time pattern matching |
+| **Context token cost** | N/A | Static (always same size) | Dynamic — only injects what's proven useful |
 
-You should use **both**. They solve different problems:
+### Forge + CLAUDE.md — use both
+
+They solve different problems:
 
 | | Forge | CLAUDE.md |
 |---|---|---|
-| **What it stores** | Dynamic patterns learned from sessions | Static rules you write manually |
-| **Example** | "This async pattern caused timeouts in last 3 sessions" | "Always use `async with` for DB connections" |
-| **Maintenance** | Automatic — learns and forgets on its own | Manual — you edit every rule |
-| **Scope** | Cross-project (promotes globally) | Single project |
-| **Best for** | Session-specific failures, edge cases, nuance | Architecture decisions, project conventions |
+| **Content** | Dynamic patterns from real sessions | Static rules you define |
+| **Example** | "This async pattern caused timeouts 3 sessions in a row" | "Always use `async with` for DB" |
+| **Updates** | Automatic (Q-value RL, time decay) | Manual (you edit) |
+| **Scope** | Cross-project (global promotion) | Single project |
 
-CLAUDE.md sets the rules. Forge handles the exceptions your rules didn't cover.
+CLAUDE.md sets the rules. Forge handles the exceptions your rules can't cover.
+
+### Forge by the numbers
+
+| | |
+|---|---|
+| **Setup time** | ~30 seconds (`forge setup`) |
+| **Runtime dependencies** | 2 (typer, pyyaml) — no heavy frameworks |
+| **Data storage** | Single SQLite file, local only |
+| **Experience types tracked** | 5 (failures, decisions, rules, knowledge, experiments) |
+| **Metrics tracked per session** | 8 KPIs (learning, routing, efficiency, etc.) |
+| **Warning formats** | 4 variants, auto-selected via A/B testing |
+| **Guard hooks** | 4 (secret detection, no-verify block, compact suggest, cost tracking) |
+| **Tests** | 1,100+ (all passing) |
 
 ## Install
 
