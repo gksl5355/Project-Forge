@@ -44,10 +44,10 @@ Session Start               Mid-session                 Session End
 
 ```bash
 # pip
-pip install git+https://github.com/gksl5355/Project-Forge.git
+pip install forge-memory
 
 # or uv (faster)
-uv tool install git+https://github.com/gksl5355/Project-Forge.git
+uv tool install forge-memory
 ```
 
 > **Important:** `forge` must be on your system PATH. Virtual-env-only installs will not work with hooks.
