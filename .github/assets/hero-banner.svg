@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#58a6ff"/>
+      <stop offset="100%" stop-color="#7ee787"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft">
+      <feGaussianBlur stdDeviation="20"/>
+    </filter>
+    <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M30 0L0 0 0 30" fill="none" stroke="#21262d" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="300" fill="url(#bg)" rx="16"/>
+  <rect width="900" height="300" fill="url(#grid)" opacity="0.4" rx="16"/>
+
+  <!-- Ambient glow -->
+  <ellipse cx="450" cy="120" rx="280" ry="130" fill="#58a6ff" filter="url(#soft)">
+    <animate attributeName="opacity" values="0.02;0.05;0.02" dur="4s" repeatCount="indefinite"/>
+  </ellipse>
+
+  <!-- Left memory cluster -->
+  <g>
+    <circle cx="85" cy="50" r="3" fill="#58a6ff" opacity="0.3">
+      <animate attributeName="opacity" values="0.2;0.6;0.2" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="155" cy="90" r="2.5" fill="#58a6ff" opacity="0.25">
+      <animate attributeName="opacity" values="0.15;0.5;0.15" dur="3.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="60" cy="135" r="2" fill="#7ee787" opacity="0.2">
+      <animate attributeName="opacity" values="0.1;0.4;0.1" dur="4.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="190" cy="140" r="3.5" fill="#58a6ff" opacity="0.2">
+      <animate attributeName="opacity" values="0.15;0.45;0.15" dur="3.8s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="105" cy="190" r="2" fill="#7ee787" opacity="0.15">
+      <animate attributeName="opacity" values="0.1;0.35;0.1" dur="4.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="165" cy="235" r="2.5" fill="#58a6ff" opacity="0.15">
+      <animate attributeName="opacity" values="0.08;0.3;0.08" dur="3.2s" repeatCount="indefinite"/>
+    </circle>
+    <line x1="85" y1="50" x2="155" y2="90" stroke="#58a6ff" stroke-width="0.5" opacity="0.12"/>
+    <line x1="155" y1="90" x2="190" y2="140" stroke="#58a6ff" stroke-width="0.5" opacity="0.1"/>
+    <line x1="60" y1="135" x2="155" y2="90" stroke="#7ee787" stroke-width="0.5" opacity="0.08"/>
+    <line x1="60" y1="135" x2="105" y2="190" stroke="#7ee787" stroke-width="0.5" opacity="0.08"/>
+    <line x1="190" y1="140" x2="165" y2="235" stroke="#58a6ff" stroke-width="0.5" opacity="0.06"/>
+    <line x1="105" y1="190" x2="165" y2="235" stroke="#58a6ff" stroke-width="0.5" opacity="0.06"/>
+    <circle r="1.5" fill="#58a6ff" opacity="0.7">
+      <animateMotion dur="4s" repeatCount="indefinite" path="M85,50 L155,90 L190,140 L165,235"/>
+    </circle>
+  </g>
+
+  <!-- Right memory cluster -->
+  <g>
+    <circle cx="725" cy="60" r="2.5" fill="#7ee787" opacity="0.25">
+      <animate attributeName="opacity" values="0.15;0.5;0.15" dur="3.7s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="810" cy="110" r="3" fill="#58a6ff" opacity="0.3">
+      <animate attributeName="opacity" values="0.2;0.55;0.2" dur="3.3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="850" cy="55" r="2" fill="#58a6ff" opacity="0.15">
+      <animate attributeName="opacity" values="0.1;0.35;0.1" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="755" cy="185" r="2" fill="#58a6ff" opacity="0.2">
+      <animate attributeName="opacity" values="0.12;0.4;0.12" dur="4.3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="840" cy="235" r="3" fill="#7ee787" opacity="0.15">
+      <animate attributeName="opacity" values="0.1;0.35;0.1" dur="3.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="700" cy="240" r="2.5" fill="#58a6ff" opacity="0.15">
+      <animate attributeName="opacity" values="0.1;0.3;0.1" dur="4.1s" repeatCount="indefinite"/>
+    </circle>
+    <line x1="725" y1="60" x2="810" y2="110" stroke="#7ee787" stroke-width="0.5" opacity="0.12"/>
+    <line x1="810" y1="110" x2="850" y2="55" stroke="#58a6ff" stroke-width="0.5" opacity="0.08"/>
+    <line x1="810" y1="110" x2="755" y2="185" stroke="#58a6ff" stroke-width="0.5" opacity="0.1"/>
+    <line x1="755" y1="185" x2="840" y2="235" stroke="#7ee787" stroke-width="0.5" opacity="0.08"/>
+    <line x1="755" y1="185" x2="700" y2="240" stroke="#58a6ff" stroke-width="0.5" opacity="0.06"/>
+    <circle r="1.5" fill="#7ee787" opacity="0.7">
+      <animateMotion dur="4.5s" repeatCount="indefinite" path="M725,60 L810,110 L755,185 L840,235"/>
+    </circle>
+  </g>
+
+  <!-- Spark particles near title -->
+  <g>
+    <circle cx="370" cy="105" r="1" fill="#f97316" opacity="0">
+      <animate attributeName="opacity" values="0;0.8;0" dur="2.5s" begin="0s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="105;90" dur="2.5s" begin="0s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="530" cy="108" r="1.2" fill="#fbbf24" opacity="0">
+      <animate attributeName="opacity" values="0;0.6;0" dur="3s" begin="1.2s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="108;92" dur="3s" begin="1.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="420" cy="100" r="0.8" fill="#f97316" opacity="0">
+      <animate attributeName="opacity" values="0;0.7;0" dur="2.8s" begin="0.7s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="100;85" dur="2.8s" begin="0.7s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="490" cy="103" r="1" fill="#fbbf24" opacity="0">
+      <animate attributeName="opacity" values="0;0.5;0" dur="3.2s" begin="2s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="103;88" dur="3.2s" begin="2s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Title -->
+  <text x="450" y="128" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="78" font-weight="800" fill="white" letter-spacing="-2" filter="url(#glow)">Forge</text>
+
+  <!-- Accent gradient line -->
+  <rect x="335" y="147" width="230" height="3" rx="1.5" fill="url(#accent)">
+    <animate attributeName="opacity" values="0.5;1;0.5" dur="3s" repeatCount="indefinite"/>
+  </rect>
+
+  <!-- Subtitle -->
+  <text x="450" y="188" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" fill="#8b949e" letter-spacing="3">PERSISTENT MEMORY FOR CODING AGENTS</text>
+
+  <!-- Bottom pill badges -->
+  <g>
+    <rect x="268" y="222" width="105" height="26" fill="#21262d" rx="13" stroke="#30363d" stroke-width="0.5"/>
+    <text x="320" y="240" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#58a6ff">Q-value RL</text>
+
+    <rect x="388" y="222" width="125" height="26" fill="#21262d" rx="13" stroke="#30363d" stroke-width="0.5"/>
+    <text x="450" y="240" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#7ee787">Auto-learning</text>
+
+    <rect x="528" y="222" width="105" height="26" fill="#21262d" rx="13" stroke="#30363d" stroke-width="0.5"/>
+    <text x="580" y="240" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#f0883e">Zero-config</text>
+  </g>
+</svg>
