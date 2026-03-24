@@ -1,3 +1,3 @@
-"""Project Forge — Experience learning CLI for coding agents."""
+"""Project Forge — Experience memory layer for coding agents."""
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
