@@ -5,13 +5,7 @@ dist/
 build/
 .pytest_cache/
 .forge/
-.claude/
+.claude/settings.local.json
 .python-version
 .venv/
 uv.lock
-
-# Internal dev tools (not distributed)
-CLAUDE.md
-forge/engines/sweep.py
-tests/test_wave6_sweep.py
-tests/test_v5_optimization.py
