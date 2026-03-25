@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src=".github/assets/hero-banner.svg" alt="Forge — Persistent memory for coding agents" width="100%"/>
+<img src=".github/assets/hero-banner.svg" alt="Forge — Long-term memory for Claude Code" width="100%"/>
 
 <br/>
 

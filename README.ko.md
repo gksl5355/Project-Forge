@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src=".github/assets/hero-banner.svg" alt="Forge — 코딩 에이전트를 위한 경험 학습 엔진" width="100%"/>
+<img src=".github/assets/hero-banner.svg" alt="Forge — Claude Code를 위한 경험 학습 엔진" width="100%"/>
 
 <br/>
 

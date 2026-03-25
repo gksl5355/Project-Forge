@@ -1,82 +1,91 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%"   stop-color="#070b10"/>
+      <stop offset="0%"   stop-color="#080c14"/>
       <stop offset="50%"  stop-color="#0d1117"/>
-      <stop offset="100%" stop-color="#070b10"/>
+      <stop offset="100%" stop-color="#080c14"/>
     </linearGradient>
     <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
       <stop offset="0%"   stop-color="#000" stop-opacity="0"/>
-      <stop offset="100%" stop-color="#000" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0.2"/>
     </radialGradient>
 
-    <!-- Ambient orbs -->
+    <!-- Ambient orbs — boosted visibility -->
     <radialGradient id="orb-purple" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.12"/>
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.18"/>
       <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="orb-blue" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.08"/>
+      <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.12"/>
       <stop offset="100%" stop-color="#58a6ff" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="orb-green" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#00ff88" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#00ff88" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#34d399" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- Title backing -->
-    <radialGradient id="title-bg" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"   stop-color="#0d1117" stop-opacity="0.92"/>
-      <stop offset="60%"  stop-color="#0d1117" stop-opacity="0.5"/>
+    <!-- Title backing — tighter, more opaque for clean readability -->
+    <radialGradient id="title-bg" cx="50%" cy="50%" r="45%">
+      <stop offset="0%"   stop-color="#0d1117" stop-opacity="0.95"/>
+      <stop offset="70%"  stop-color="#0d1117" stop-opacity="0.6"/>
       <stop offset="100%" stop-color="#0d1117" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- Title underline -->
-    <linearGradient id="line-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%"   stop-color="#00ff88" stop-opacity="0"/>
-      <stop offset="25%"  stop-color="#00ff88" stop-opacity="0.8"/>
-      <stop offset="75%"  stop-color="#00ff88" stop-opacity="0.8"/>
-      <stop offset="100%" stop-color="#00ff88" stop-opacity="0"/>
+    <!-- Title gradient: bright white core → soft blue edges -->
+    <linearGradient id="title-fill" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#e0e7ff"/>
+      <stop offset="30%"  stop-color="#ffffff"/>
+      <stop offset="70%"  stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e0e7ff"/>
     </linearGradient>
 
-    <!-- 3D box gradients -->
+    <!-- Underline: now a white→blue accent instead of green (decouple from halo) -->
+    <linearGradient id="line-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#58a6ff" stop-opacity="0"/>
+      <stop offset="20%"  stop-color="#58a6ff" stop-opacity="0.7"/>
+      <stop offset="50%"  stop-color="#a78bfa" stop-opacity="0.9"/>
+      <stop offset="80%"  stop-color="#58a6ff" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#58a6ff" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- 3D box gradients — significantly boosted -->
     <linearGradient id="box-purple-top" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.20"/>
-      <stop offset="100%" stop-color="#c4b5fd" stop-opacity="0.10"/>
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#c4b5fd" stop-opacity="0.18"/>
     </linearGradient>
     <linearGradient id="box-purple-face" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.16"/>
-      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.06"/>
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.10"/>
     </linearGradient>
     <linearGradient id="box-purple-side" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.10"/>
-      <stop offset="100%" stop-color="#6d28d9" stop-opacity="0.03"/>
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#6d28d9" stop-opacity="0.06"/>
     </linearGradient>
 
     <linearGradient id="box-blue-top" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.25"/>
-      <stop offset="100%" stop-color="#79c0ff" stop-opacity="0.12"/>
+      <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.40"/>
+      <stop offset="100%" stop-color="#79c0ff" stop-opacity="0.20"/>
     </linearGradient>
     <linearGradient id="box-blue-face" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.20"/>
-      <stop offset="100%" stop-color="#1d6fc0" stop-opacity="0.06"/>
+      <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#1d6fc0" stop-opacity="0.10"/>
     </linearGradient>
     <linearGradient id="box-blue-side" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#1a5aa0" stop-opacity="0.03"/>
+      <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#1a5aa0" stop-opacity="0.06"/>
     </linearGradient>
 
     <linearGradient id="box-green-top" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" stop-color="#00ff88" stop-opacity="0.22"/>
-      <stop offset="100%" stop-color="#66ffbb" stop-opacity="0.10"/>
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#6ee7b7" stop-opacity="0.18"/>
     </linearGradient>
     <linearGradient id="box-green-face" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#00ff88" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#00b86b" stop-opacity="0.06"/>
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#059669" stop-opacity="0.10"/>
     </linearGradient>
     <linearGradient id="box-green-side" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00ff88" stop-opacity="0.10"/>
-      <stop offset="100%" stop-color="#00994d" stop-opacity="0.03"/>
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#047857" stop-opacity="0.06"/>
     </linearGradient>
 
     <!-- Flow gradients -->
@@ -86,16 +95,17 @@
     </linearGradient>
     <linearGradient id="flow-2" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#58a6ff"/>
-      <stop offset="100%" stop-color="#00ff88"/>
+      <stop offset="100%" stop-color="#34d399"/>
     </linearGradient>
 
     <!-- Glow -->
     <filter id="glow-soft" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feGaussianBlur stdDeviation="5" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
+    <!-- Title halo — subtle blue instead of bright green -->
     <filter id="title-halo" x="-30%" y="-100%" width="160%" height="300%">
-      <feGaussianBlur stdDeviation="28"/>
+      <feGaussianBlur stdDeviation="22"/>
     </filter>
   </defs>
 
@@ -114,130 +124,125 @@
     <animate attributeName="rx" values="200;228;200" dur="9s" repeatCount="indefinite"/>
   </ellipse>
 
-  <!-- ═══ TEXT BLOCK (top zone: y=30~130) ═══ -->
-  <ellipse cx="600" cy="85" rx="340" ry="85" fill="url(#title-bg)"/>
+  <!-- ═══ TEXT BLOCK ═══ -->
+  <ellipse cx="600" cy="82" rx="320" ry="80" fill="url(#title-bg)"/>
 
-  <!-- FORGE halo (big, bright) -->
-  <text x="600" y="68" text-anchor="middle"
+  <!-- FORGE halo — brighter, wider glow for punch -->
+  <text x="600" y="66" text-anchor="middle"
     font-family="'SF Mono','Fira Code','JetBrains Mono',monospace"
-    font-size="72" font-weight="700" fill="#00ff88" filter="url(#title-halo)"
-    opacity="0.4">FORGE</text>
+    font-size="68" font-weight="700" fill="#a5b4fc" filter="url(#title-halo)"
+    opacity="0.45">FORGE</text>
 
-  <!-- FORGE title -->
-  <text x="600" y="68" text-anchor="middle"
+  <!-- FORGE title — pure white center, high contrast -->
+  <text x="600" y="66" text-anchor="middle"
     font-family="'SF Mono','Fira Code','JetBrains Mono',monospace"
-    font-size="72" font-weight="700" fill="#ffffff"
-    letter-spacing="14">FORGE</text>
+    font-size="68" font-weight="700" fill="url(#title-fill)"
+    letter-spacing="16" style="text-shadow: 0 0 30px rgba(165,180,252,0.3)">FORGE</text>
 
-  <!-- Underline -->
-  <rect x="430" y="82" width="340" height="2" fill="url(#line-grad)">
-    <animate attributeName="opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite"/>
+  <!-- Underline — blue→purple gradient, thicker -->
+  <rect x="420" y="80" width="360" height="2.5" rx="1.25" fill="url(#line-grad)">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite"/>
   </rect>
 
-  <!-- Tagline -->
-  <text x="600" y="112" text-anchor="middle"
+  <!-- Tagline — bigger, bolder, more visible -->
+  <text x="600" y="110" text-anchor="middle"
     font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"
-    font-size="16" font-weight="400" fill="#e6edf3"
-    letter-spacing="3">Long-term memory for your coding agent</text>
+    font-size="17" font-weight="500" fill="#f0f6fc"
+    letter-spacing="2.5">Long-term memory for Claude Code</text>
 
-  <!-- Status -->
-  <text x="600" y="136" text-anchor="middle"
+  <!-- Status — brighter than before -->
+  <text x="600" y="134" text-anchor="middle"
     font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"
-    font-size="13" font-weight="300" fill="#8b949e"
+    font-size="13" font-weight="400" fill="#9ca3af"
     letter-spacing="2">learns quietly · remembers always</text>
 
-  <!-- ═══ 3D FLOW DIAGRAM (bottom zone: y=155~305) ═══ -->
+  <!-- ═══ 3D FLOW DIAGRAM ═══ -->
 
   <!-- LEFT BOX: Past Sessions -->
   <g transform="translate(95, 220)">
-    <polygon points="0,-14 65,-36 130,-14 65,8" fill="url(#box-purple-top)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.35"/>
-    <polygon points="0,-14 65,8 65,50 0,28" fill="url(#box-purple-face)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.2"/>
-    <polygon points="65,8 130,-14 130,28 65,50" fill="url(#box-purple-side)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.15"/>
-    <text x="65" y="-8" text-anchor="middle" font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="11" fill="#c4b5fd" opacity="1" letter-spacing="1.5" font-weight="600">PAST SESSIONS</text>
+    <polygon points="0,-14 65,-36 130,-14 65,8" fill="url(#box-purple-top)" stroke="#a78bfa" stroke-width="0.7" stroke-opacity="0.5"/>
+    <polygon points="0,-14 65,8 65,50 0,28" fill="url(#box-purple-face)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.3"/>
+    <polygon points="65,8 130,-14 130,28 65,50" fill="url(#box-purple-side)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.2"/>
+    <text x="65" y="-8" text-anchor="middle" font-family="'SF Mono','Fira Code',monospace" font-size="11.5" fill="#d4bfff" letter-spacing="1.2" font-weight="600">PAST SESSIONS</text>
   </g>
 
-  <!-- CENTER BOX: Forge Engine (larger) -->
+  <!-- CENTER BOX: Forge Engine (larger, more prominent) -->
   <g transform="translate(510, 210)">
-    <polygon points="0,-18 80,-46 160,-18 80,10" fill="url(#box-blue-top)" stroke="#58a6ff" stroke-width="0.6" stroke-opacity="0.4"/>
-    <polygon points="0,-18 80,10 80,62 0,34" fill="url(#box-blue-face)" stroke="#58a6ff" stroke-width="0.6" stroke-opacity="0.25"/>
-    <polygon points="80,10 160,-18 160,34 80,62" fill="url(#box-blue-side)" stroke="#58a6ff" stroke-width="0.6" stroke-opacity="0.2"/>
-    <text x="68" y="28" text-anchor="middle" font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="14" fill="#58a6ff" opacity="0.45">⚡</text>
-    <text x="80" y="-12" text-anchor="middle" font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="11" fill="#79c0ff" opacity="1" letter-spacing="1.5" font-weight="600">FORGE ENGINE</text>
+    <polygon points="0,-18 80,-46 160,-18 80,10" fill="url(#box-blue-top)" stroke="#58a6ff" stroke-width="0.8" stroke-opacity="0.55"/>
+    <polygon points="0,-18 80,10 80,62 0,34" fill="url(#box-blue-face)" stroke="#58a6ff" stroke-width="0.6" stroke-opacity="0.35"/>
+    <polygon points="80,10 160,-18 160,34 80,62" fill="url(#box-blue-side)" stroke="#58a6ff" stroke-width="0.6" stroke-opacity="0.25"/>
+    <text x="80" y="-12" text-anchor="middle" font-family="'SF Mono','Fira Code',monospace" font-size="12.5" fill="#93c5fd" letter-spacing="1.2" font-weight="700">FORGE ENGINE</text>
   </g>
 
   <!-- RIGHT BOX: Next Session -->
   <g transform="translate(975, 220)">
-    <polygon points="0,-14 65,-36 130,-14 65,8" fill="url(#box-green-top)" stroke="#00ff88" stroke-width="0.5" stroke-opacity="0.35"/>
-    <polygon points="0,-14 65,8 65,50 0,28" fill="url(#box-green-face)" stroke="#00ff88" stroke-width="0.5" stroke-opacity="0.2"/>
-    <polygon points="65,8 130,-14 130,28 65,50" fill="url(#box-green-side)" stroke="#00ff88" stroke-width="0.5" stroke-opacity="0.15"/>
-    <text x="65" y="-8" text-anchor="middle" font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="11" fill="#66ffbb" opacity="1" letter-spacing="1.5" font-weight="600">NEXT SESSION</text>
+    <polygon points="0,-14 65,-36 130,-14 65,8" fill="url(#box-green-top)" stroke="#34d399" stroke-width="0.7" stroke-opacity="0.5"/>
+    <polygon points="0,-14 65,8 65,50 0,28" fill="url(#box-green-face)" stroke="#34d399" stroke-width="0.5" stroke-opacity="0.3"/>
+    <polygon points="65,8 130,-14 130,28 65,50" fill="url(#box-green-side)" stroke="#34d399" stroke-width="0.5" stroke-opacity="0.2"/>
+    <text x="65" y="-8" text-anchor="middle" font-family="'SF Mono','Fira Code',monospace" font-size="11.5" fill="#86efac" letter-spacing="1.2" font-weight="600">NEXT SESSION</text>
   </g>
 
-  <!-- ═══ FLOW PATHS ═══ -->
+  <!-- ═══ FLOW PATHS — boosted opacity ═══ -->
   <!-- Left → Center (upper) -->
-  <path d="M225,218 C310,210 420,200 510,215" fill="none" stroke="url(#flow-1)" stroke-width="1.5" stroke-opacity="0.3" stroke-dasharray="6,4">
+  <path d="M225,218 C310,210 420,200 510,215" fill="none" stroke="url(#flow-1)" stroke-width="1.8" stroke-opacity="0.45" stroke-dasharray="6,4">
     <animate attributeName="stroke-dashoffset" values="0;-20" dur="2s" repeatCount="indefinite"/>
   </path>
   <!-- Left → Center (lower) -->
-  <path d="M225,232 C310,242 420,248 510,230" fill="none" stroke="url(#flow-1)" stroke-width="1" stroke-opacity="0.15" stroke-dasharray="4,6">
+  <path d="M225,232 C310,242 420,248 510,230" fill="none" stroke="url(#flow-1)" stroke-width="1.2" stroke-opacity="0.25" stroke-dasharray="4,6">
     <animate attributeName="stroke-dashoffset" values="0;-20" dur="2.5s" repeatCount="indefinite"/>
   </path>
 
   <!-- Center → Right (upper) -->
-  <path d="M670,215 C760,208 880,206 975,218" fill="none" stroke="url(#flow-2)" stroke-width="1.5" stroke-opacity="0.3" stroke-dasharray="6,4">
+  <path d="M670,215 C760,208 880,206 975,218" fill="none" stroke="url(#flow-2)" stroke-width="1.8" stroke-opacity="0.45" stroke-dasharray="6,4">
     <animate attributeName="stroke-dashoffset" values="0;-20" dur="2s" repeatCount="indefinite"/>
   </path>
   <!-- Center → Right (lower) -->
-  <path d="M670,230 C760,242 880,246 975,232" fill="none" stroke="url(#flow-2)" stroke-width="1" stroke-opacity="0.15" stroke-dasharray="4,6">
+  <path d="M670,230 C760,242 880,246 975,232" fill="none" stroke="url(#flow-2)" stroke-width="1.2" stroke-opacity="0.25" stroke-dasharray="4,6">
     <animate attributeName="stroke-dashoffset" values="0;-20" dur="2.5s" repeatCount="indefinite"/>
   </path>
 
-  <!-- ═══ FLOW LABELS (what's moving) ═══ -->
-  <!-- Failures & patterns flowing left → center -->
+  <!-- ═══ FLOW LABELS — longer visible window ═══ -->
   <text opacity="0">
-    <animateMotion dur="5s" repeatCount="indefinite" path="M225,208 C310,200 420,190 510,205"/>
-    <animate attributeName="opacity" values="0;0.7;0.7;0" dur="5s" repeatCount="indefinite"/>
-    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="10" fill="#c4b5fd" font-weight="500" letter-spacing="0.5">failures</tspan>
+    <animateMotion dur="4.5s" repeatCount="indefinite" path="M225,208 C310,200 420,190 510,205"/>
+    <animate attributeName="opacity" values="0;0.85;0.85;0.85;0" dur="4.5s" repeatCount="indefinite"/>
+    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="10.5" fill="#d4bfff" font-weight="500" letter-spacing="0.5">failures</tspan>
   </text>
   <text opacity="0">
-    <animateMotion dur="5.5s" repeatCount="indefinite" path="M225,242 C310,252 420,255 510,240" begin="2s"/>
-    <animate attributeName="opacity" values="0;0.6;0.6;0" dur="5.5s" repeatCount="indefinite" begin="2s"/>
-    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="10" fill="#c4b5fd" font-weight="500" letter-spacing="0.5">patterns</tspan>
+    <animateMotion dur="5s" repeatCount="indefinite" path="M225,242 C310,252 420,255 510,240" begin="1.8s"/>
+    <animate attributeName="opacity" values="0;0.75;0.75;0.75;0" dur="5s" repeatCount="indefinite" begin="1.8s"/>
+    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="10.5" fill="#d4bfff" font-weight="500" letter-spacing="0.5">patterns</tspan>
   </text>
 
-  <!-- Warnings flowing center → right -->
   <text opacity="0">
-    <animateMotion dur="5s" repeatCount="indefinite" path="M670,205 C760,198 880,196 975,208"/>
-    <animate attributeName="opacity" values="0;0.7;0.7;0" dur="5s" repeatCount="indefinite"/>
-    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="10" fill="#66ffbb" font-weight="500" letter-spacing="0.5">warnings</tspan>
+    <animateMotion dur="4.5s" repeatCount="indefinite" path="M670,205 C760,198 880,196 975,208"/>
+    <animate attributeName="opacity" values="0;0.85;0.85;0.85;0" dur="4.5s" repeatCount="indefinite"/>
+    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="10.5" fill="#86efac" font-weight="500" letter-spacing="0.5">warnings</tspan>
   </text>
   <text opacity="0">
-    <animateMotion dur="5.5s" repeatCount="indefinite" path="M670,240 C760,252 880,255 975,242" begin="2s"/>
-    <animate attributeName="opacity" values="0;0.6;0.6;0" dur="5.5s" repeatCount="indefinite" begin="2s"/>
-    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="10" fill="#66ffbb" font-weight="500" letter-spacing="0.5">experiences</tspan>
+    <animateMotion dur="5s" repeatCount="indefinite" path="M670,240 C760,252 880,255 975,242" begin="1.8s"/>
+    <animate attributeName="opacity" values="0;0.75;0.75;0.75;0" dur="5s" repeatCount="indefinite" begin="1.8s"/>
+    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="10.5" fill="#86efac" font-weight="500" letter-spacing="0.5">experiences</tspan>
   </text>
 
   <!-- ═══ PARTICLES ═══ -->
-  <!-- Left → Center -->
-  <circle r="2.5" fill="#a78bfa" filter="url(#glow-soft)">
+  <circle r="2.8" fill="#a78bfa" filter="url(#glow-soft)">
     <animateMotion dur="3s" repeatCount="indefinite" path="M225,218 C310,210 420,200 510,215"/>
-    <animate attributeName="opacity" values="0;0.9;0.9;0" dur="3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;0.95;0.95;0" dur="3s" repeatCount="indefinite"/>
   </circle>
-  <circle r="1.8" fill="#c4b5fd">
+  <circle r="2" fill="#c4b5fd">
     <animateMotion dur="3.8s" repeatCount="indefinite" path="M225,232 C310,242 420,248 510,230" begin="1s"/>
-    <animate attributeName="opacity" values="0;0.7;0.7;0" dur="3.8s" repeatCount="indefinite" begin="1s"/>
+    <animate attributeName="opacity" values="0;0.8;0.8;0" dur="3.8s" repeatCount="indefinite" begin="1s"/>
   </circle>
 
-  <!-- Center → Right -->
-  <circle r="2.5" fill="#00ff88" filter="url(#glow-soft)">
+  <circle r="2.8" fill="#34d399" filter="url(#glow-soft)">
     <animateMotion dur="3s" repeatCount="indefinite" path="M670,215 C760,208 880,206 975,218"/>
-    <animate attributeName="opacity" values="0;0.9;0.9;0" dur="3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;0.95;0.95;0" dur="3s" repeatCount="indefinite"/>
   </circle>
-  <circle r="1.8" fill="#66ffbb">
+  <circle r="2" fill="#6ee7b7">
     <animateMotion dur="3.8s" repeatCount="indefinite" path="M670,230 C760,242 880,246 975,232" begin="1s"/>
-    <animate attributeName="opacity" values="0;0.7;0.7;0" dur="3.8s" repeatCount="indefinite" begin="1s"/>
+    <animate attributeName="opacity" values="0;0.8;0.8;0" dur="3.8s" repeatCount="indefinite" begin="1s"/>
   </circle>
 
   <!-- Bottom accent -->
-  <line x1="0" y1="319" x2="1200" y2="319" stroke="#1e2a3a" stroke-width="0.5" opacity="0.4"/>
+  <line x1="0" y1="319" x2="1200" y2="319" stroke="#1e2a3a" stroke-width="0.5" opacity="0.5"/>
 </svg>
