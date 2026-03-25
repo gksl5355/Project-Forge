@@ -115,35 +115,35 @@
   </ellipse>
 
   <!-- ═══ TEXT BLOCK (top zone: y=30~130) ═══ -->
-  <ellipse cx="600" cy="75" rx="280" ry="70" fill="url(#title-bg)"/>
+  <ellipse cx="600" cy="85" rx="340" ry="85" fill="url(#title-bg)"/>
 
-  <!-- FORGE halo -->
-  <text x="600" y="62" text-anchor="middle"
+  <!-- FORGE halo (big, bright) -->
+  <text x="600" y="68" text-anchor="middle"
     font-family="'SF Mono','Fira Code','JetBrains Mono',monospace"
-    font-size="56" font-weight="700" fill="#00ff88" filter="url(#title-halo)"
-    opacity="0.3">FORGE</text>
+    font-size="72" font-weight="700" fill="#00ff88" filter="url(#title-halo)"
+    opacity="0.4">FORGE</text>
 
   <!-- FORGE title -->
-  <text x="600" y="62" text-anchor="middle"
+  <text x="600" y="68" text-anchor="middle"
     font-family="'SF Mono','Fira Code','JetBrains Mono',monospace"
-    font-size="56" font-weight="700" fill="#e6edf3"
-    letter-spacing="10">FORGE</text>
+    font-size="72" font-weight="700" fill="#ffffff"
+    letter-spacing="14">FORGE</text>
 
   <!-- Underline -->
-  <rect x="470" y="74" width="260" height="1.5" fill="url(#line-grad)">
-    <animate attributeName="opacity" values="0.5;1;0.5" dur="3s" repeatCount="indefinite"/>
+  <rect x="430" y="82" width="340" height="2" fill="url(#line-grad)">
+    <animate attributeName="opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite"/>
   </rect>
 
   <!-- Tagline -->
-  <text x="600" y="100" text-anchor="middle"
+  <text x="600" y="112" text-anchor="middle"
     font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"
-    font-size="14" font-weight="400" fill="#c9d1d9"
-    letter-spacing="2.5">Long-term memory for your coding agent</text>
+    font-size="16" font-weight="400" fill="#e6edf3"
+    letter-spacing="3">Long-term memory for your coding agent</text>
 
   <!-- Status -->
-  <text x="600" y="122" text-anchor="middle"
+  <text x="600" y="136" text-anchor="middle"
     font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif"
-    font-size="12" font-weight="300" fill="#8b949e"
+    font-size="13" font-weight="300" fill="#8b949e"
     letter-spacing="2">learns quietly · remembers always</text>
 
   <!-- ═══ 3D FLOW DIAGRAM (bottom zone: y=155~305) ═══ -->
@@ -153,7 +153,7 @@
     <polygon points="0,-14 65,-36 130,-14 65,8" fill="url(#box-purple-top)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.35"/>
     <polygon points="0,-14 65,8 65,50 0,28" fill="url(#box-purple-face)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.2"/>
     <polygon points="65,8 130,-14 130,28 65,50" fill="url(#box-purple-side)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.15"/>
-    <text x="65" y="-8" text-anchor="middle" font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="9" fill="#c4b5fd" opacity="0.9" letter-spacing="1">PAST SESSIONS</text>
+    <text x="65" y="-8" text-anchor="middle" font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="11" fill="#c4b5fd" opacity="1" letter-spacing="1.5" font-weight="600">PAST SESSIONS</text>
   </g>
 
   <!-- CENTER BOX: Forge Engine (larger) -->
@@ -162,7 +162,7 @@
     <polygon points="0,-18 80,10 80,62 0,34" fill="url(#box-blue-face)" stroke="#58a6ff" stroke-width="0.6" stroke-opacity="0.25"/>
     <polygon points="80,10 160,-18 160,34 80,62" fill="url(#box-blue-side)" stroke="#58a6ff" stroke-width="0.6" stroke-opacity="0.2"/>
     <text x="68" y="28" text-anchor="middle" font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="14" fill="#58a6ff" opacity="0.45">⚡</text>
-    <text x="80" y="-12" text-anchor="middle" font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="9" fill="#79c0ff" opacity="0.95" letter-spacing="1">FORGE ENGINE</text>
+    <text x="80" y="-12" text-anchor="middle" font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="11" fill="#79c0ff" opacity="1" letter-spacing="1.5" font-weight="600">FORGE ENGINE</text>
   </g>
 
   <!-- RIGHT BOX: Next Session -->
@@ -170,7 +170,7 @@
     <polygon points="0,-14 65,-36 130,-14 65,8" fill="url(#box-green-top)" stroke="#00ff88" stroke-width="0.5" stroke-opacity="0.35"/>
     <polygon points="0,-14 65,8 65,50 0,28" fill="url(#box-green-face)" stroke="#00ff88" stroke-width="0.5" stroke-opacity="0.2"/>
     <polygon points="65,8 130,-14 130,28 65,50" fill="url(#box-green-side)" stroke="#00ff88" stroke-width="0.5" stroke-opacity="0.15"/>
-    <text x="65" y="-8" text-anchor="middle" font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="9" fill="#66ffbb" opacity="0.9" letter-spacing="1">NEXT SESSION</text>
+    <text x="65" y="-8" text-anchor="middle" font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="11" fill="#66ffbb" opacity="1" letter-spacing="1.5" font-weight="600">NEXT SESSION</text>
   </g>
 
   <!-- ═══ FLOW PATHS ═══ -->
@@ -197,24 +197,24 @@
   <text opacity="0">
     <animateMotion dur="5s" repeatCount="indefinite" path="M225,208 C310,200 420,190 510,205"/>
     <animate attributeName="opacity" values="0;0.7;0.7;0" dur="5s" repeatCount="indefinite"/>
-    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="9" fill="#c4b5fd" letter-spacing="0.5">failures</tspan>
+    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="10" fill="#c4b5fd" font-weight="500" letter-spacing="0.5">failures</tspan>
   </text>
   <text opacity="0">
     <animateMotion dur="5.5s" repeatCount="indefinite" path="M225,242 C310,252 420,255 510,240" begin="2s"/>
     <animate attributeName="opacity" values="0;0.6;0.6;0" dur="5.5s" repeatCount="indefinite" begin="2s"/>
-    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="9" fill="#c4b5fd" letter-spacing="0.5">patterns</tspan>
+    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="10" fill="#c4b5fd" font-weight="500" letter-spacing="0.5">patterns</tspan>
   </text>
 
   <!-- Warnings flowing center → right -->
   <text opacity="0">
     <animateMotion dur="5s" repeatCount="indefinite" path="M670,205 C760,198 880,196 975,208"/>
     <animate attributeName="opacity" values="0;0.7;0.7;0" dur="5s" repeatCount="indefinite"/>
-    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="9" fill="#66ffbb" letter-spacing="0.5">warnings</tspan>
+    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="10" fill="#66ffbb" font-weight="500" letter-spacing="0.5">warnings</tspan>
   </text>
   <text opacity="0">
     <animateMotion dur="5.5s" repeatCount="indefinite" path="M670,240 C760,252 880,255 975,242" begin="2s"/>
     <animate attributeName="opacity" values="0;0.6;0.6;0" dur="5.5s" repeatCount="indefinite" begin="2s"/>
-    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="9" fill="#66ffbb" letter-spacing="0.5">experiences</tspan>
+    <tspan font-family="-apple-system,'Segoe UI',Helvetica,sans-serif" font-size="10" fill="#66ffbb" font-weight="500" letter-spacing="0.5">experiences</tspan>
   </text>
 
   <!-- ═══ PARTICLES ═══ -->
