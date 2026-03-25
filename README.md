@@ -39,23 +39,25 @@ That's it. Start coding normally — Forge learns silently from every session.
 
 ---
 
-## What It Does
+## Think of It Like a New Team Member
 
-Forge gives your Claude Code agent **persistent memory across sessions**.
+Forge is like a junior developer sitting next to your agent — one who quietly watches every session, takes notes, and gets smarter over time.
 
-It captures failures and fixes from each session, measures which experiences actually helped via Q-value reinforcement learning, and injects only the proven-useful ones into future sessions — before the agent repeats a mistake.
+- **Week 1**: Just observing. Learning your patterns silently.
+- **Week 2**: *"Hey, last time you tried that, it broke — here's what worked."*
+- **Month 2**: Anticipates problems before they happen. Knows your codebase's quirks.
 
-### How It Works
+It's not perfect from day one. But the longer you work together, the better it gets — and unlike a real teammate, it never forgets.
+
+### How It Stays Lean
 
 <img src=".github/assets/flow-diagram.svg" alt="Forge flow diagram" width="100%"/>
 
-**Q-value ranking** — Each experience has a Q score. Helped avoid an error? Q goes up. Ignored? Q goes down. Only high-Q experiences get injected.
+**Proven advice only** — Every experience is scored by real outcomes. Helped avoid an error? Score goes up. Got ignored? Goes down. Only high-scoring experiences make it to your next session.
 
-**Time decay** — Old patterns lose priority automatically. A 3-month-old error won't clutter every session.
+**Fresh over stale** — Recent patterns take priority. A 3-month-old error won't waste tokens every session.
 
-**A/B format testing** — Same warning, 4 different phrasings. Forge finds which one your agent actually follows.
-
-Result: **only proven-useful experiences, in the most effective format, at minimum token cost.**
+**Self-improving format** — The same warning can be phrased 4 ways. Forge tests which one your agent actually follows, then sticks with what works.
 
 ## Forge vs. Alternatives
 
@@ -93,30 +95,31 @@ Use `forge score --detail` for the full breakdown.
 
 ## Features
 
-### Automatic Learning
-Every session end triggers analysis. Failures captured, Q-values updated, weak patterns pruned — no manual work needed.
+**Learns from every session** — Captures failures and fixes automatically. No tagging or labeling needed.
 
-### Smart Context Injection
-Experiences ranked by Q-value x recency x relevance. Only the top ones enter your context window.
+**Only speaks when useful** — Ranks experiences by real outcomes. Your context window stays clean.
 
-### Guard Hooks
-- **Secret detection** — catches API keys and tokens before commit
-- **`--no-verify` blocking** — prevents pre-commit bypass
-- **Session health** — suggests `/compact` when sessions get long
+**Guards your back** — Catches API keys before commit, blocks `--no-verify`, suggests `/compact` when sessions get long.
 
-### Cross-Project Promotion
-Same pattern in 2+ projects? Automatically promoted to global, shared across all workspaces.
+**Gets smarter across projects** — Same pattern in 2+ projects? Automatically shared across all your workspaces.
 
-### Circuit Breaker
-Detects failure loops and intervenes before wasting more tokens.
+**Breaks the loop** — Detects when a session is stuck repeating the same failure and intervenes.
+
+**Orchestrates agent teams** — Manages multi-agent team runs and automatically collects what worked, what failed, and the best team configurations.
+
+**Routes to the right model** — Picks the optimal model (Haiku/Sonnet/Opus) per task category based on past success rates. No manual configuration needed.
+
+**Self-tunes** — `forge optimize` explores parameter combinations against your actual session data, finds what improves your Forge Score, and applies the best config automatically.
 
 ## What to Expect
 
-Forge needs real sessions to learn from:
+Forge needs real sessions to learn from — it gets better the more you use it:
 
-- **Sessions 1-3**: Collecting patterns silently. No warnings yet.
-- **Sessions 4-5**: First warnings appear.
-- **Sessions 6+**: Warnings get accurate. Score climbs.
+- **Sessions 1-3**: Quietly watching. Taking notes.
+- **Sessions 4-5**: *"Hey, I've seen this before."* First warnings appear.
+- **Sessions 6+**: Anticipating problems. Your Forge Score climbs.
+
+This is by design — no noise until it has something useful to say.
 
 ## Commands
 
