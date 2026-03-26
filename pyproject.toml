@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "forge-memory"
 version = "1.2.0"
-description = "Experience memory layer for coding agents — learn from mistakes, inject proven fixes"
+description = "Experience memory layer for Claude Code — learn from mistakes, inject proven fixes"
 license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.12"
-authors = [{name = "gksl5355"}]
+authors = [{name = "0xshuttle"}]
 keywords = ["cli", "coding-agent", "experience-learning", "claude-code", "reinforcement-learning"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -27,9 +27,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/gksl5355/Project-Forge"
-Repository = "https://github.com/gksl5355/Project-Forge"
-Issues = "https://github.com/gksl5355/Project-Forge/issues"
+Homepage = "https://github.com/0xshuttle/Project-Forge"
+Repository = "https://github.com/0xshuttle/Project-Forge"
+Issues = "https://github.com/0xshuttle/Project-Forge/issues"
 
 [project.optional-dependencies]
 dev = [

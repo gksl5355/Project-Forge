@@ -3,7 +3,7 @@
 ## Setup
 
 ```bash
-git clone https://github.com/gksl5355/Project-Forge.git
+git clone https://github.com/0xshuttle/Project-Forge.git
 cd Project-Forge
 
 # With pip
